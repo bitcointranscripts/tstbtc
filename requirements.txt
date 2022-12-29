@@ -1,0 +1,5 @@
+typer==0.3.2
+colorama==0.4.4
+shellingham==1.4.0
+youtube_transcript_api==0.5.0
+requests_html
