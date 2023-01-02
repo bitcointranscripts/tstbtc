@@ -8,6 +8,7 @@ from typing import Optional
 import typer
 from requests_html import HTMLSession
 from youtube_transcript_api import YouTubeTranscriptApi
+import os
 
 from yttbtc import __app_name__, __version__
 import subprocess
@@ -73,8 +74,10 @@ def yt2btc(
             opf.write(output_text + '\n')
 
 
+    absolute_path = os.path.abspath(file_name_with_ext)
+
     """ INITIALIZE AND OPEN A PR"""
     print("Initializing git and creating a repo \n")
-    subprocess.call(['bash', 'github.sh', file_name_with_ext, file_name])
+    subprocess.call(['bash', 'github.sh', file_name_with_ext, file_name, absolute_path])
 
 
