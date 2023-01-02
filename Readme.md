@@ -1,6 +1,22 @@
 # YTB_TO_BTCSCRIPT
 
-This project converts youtube videos to bitcoinscripts and opens a PR. It uses youwhisper to transcribe the videos, then collects meta data about the video using command-line arguments. It then uses that information to open a Pull Request on the bitcoinscript repo.
+This project converts youtube videos to bitcoinscripts and opens a PR on . It uses youtube_transcript_api to transcribe the videos, then collects meta data about the video using `requests_html`. It then uses the supplied cli arguments and file to open a Pull Request on the [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts) repo.
+
+## Steps:
+
+The step-by-step flow for the scripts are:
+
+- transcribe given video and generate the output file
+
+- authenticate the user to github
+
+- fork the transcript repo/use their existing fork, clone it and branch out
+
+- copy the transcript file to the new transcript repo
+
+- commit new file and push  
+
+- then open a PR 
 
 ##  Usage
 
@@ -17,7 +33,7 @@ To check the version:
 
 ## OTHER REQUIREMENTS
 
-To enable us create a new repo to push the transcribed file and open a PR, install `GITHUB CLI` using the instruction [here](https://github.com/cli/cli#installation). Following the prompt, please select the below options from the prompt to login:
+To enable us fork bitcointranscript repo and open a PR, we require you to login into your github account. Kindly install `GITHUB CLI` using the instructions on their repo [here](https://github.com/cli/cli#installation). Following the prompt, please select the below options from the prompt to login:
 
 -  what account do you want to log into? `Github.com`
 
@@ -27,4 +43,4 @@ To enable us create a new repo to push the transcribed file and open a PR, insta
 
 -  How would you like to authenticate Github CLI? `Login with a web browser`
 
-copy the generated one-time pass-code and paste in the browser to authenticate
+copy the generated one-time pass-code and paste in the browser to authenticate if you have enabled 2FA
