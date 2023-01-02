@@ -1,6 +1,6 @@
 # YTB_TO_BTCSCRIPT
 
-This project converts youtube videos to bitcoinscripts and opens a PR on . It uses youtube_transcript_api to transcribe the videos, then collects meta data about the video using `requests_html`. It then uses the supplied cli arguments and file to open a Pull Request on the [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts) repo.
+This project converts youtube videos to bitcoinscripts and opens a PR on [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts) repo. It uses `youtube_transcript_api` to transcribe the videos, then collects meta data about the video using `requests_html`. It then uses the supplied cli arguments and file to open a Pull Request on the [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts) repo.
 
 ## Steps:
 
