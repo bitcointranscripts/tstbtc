@@ -4,7 +4,13 @@ read USERNAME
 
 gh auth login
 
-gh repo fork bitcointranscripts/bitcointranscripts --clone 
+if [ -d "./bitcointranscripts/" ]; then
+
+  echo "project already cloned"
+
+else
+  gh repo fork bitcointranscripts/bitcointranscripts --clone 
+fi
 
 cd bitcointranscripts
 
