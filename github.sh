@@ -2,7 +2,11 @@
 echo "What is your github username?"
 read USERNAME
 
-gh auth login
+if gh auth status;  then 
+  echo 'already logged into github'
+else 
+  gh auth login
+fi
 
 if [ -d "./bitcointranscripts/" ]; then
 
