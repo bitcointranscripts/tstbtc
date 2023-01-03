@@ -2,13 +2,23 @@
 echo "What is your github username?"
 read USERNAME
 
-gh auth login
+if gh auth status;  then 
+  echo 'already logged into github'
+else 
+  gh auth login
+fi
 
-gh repo fork bitcointranscripts/bitcointranscripts --clone 
+if [ -d "./bitcointranscripts/" ]; then
 
-cd bitcointranscripts
+  cd bitcointranscripts
 
-git checkout -b ${2}
+else
+  gh repo fork bitcointranscripts/bitcointranscripts --clone 
+
+  cd bitcointranscripts
+
+  git checkout -b ${2}
+fi
 
 mv ${3} .
 
