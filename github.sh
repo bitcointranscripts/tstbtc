@@ -6,15 +6,15 @@ gh auth login
 
 if [ -d "./bitcointranscripts/" ]; then
 
-  echo "project already cloned"
+  cd bitcointranscripts
 
 else
   gh repo fork bitcointranscripts/bitcointranscripts --clone 
+
+  cd bitcointranscripts
+
+  git checkout -b ${2}
 fi
-
-cd bitcointranscripts
-
-git checkout -b ${2}
 
 mv ${3} .
 
