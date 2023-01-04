@@ -1,5 +1,9 @@
-typer==0.3.2
+typer~=0.7.0
 colorama==0.4.4
 shellingham==1.4.0
-youtube_transcript_api==0.5.0
 requests_html
+pytube~=12.1.2
+moviepy~=1.0.3
+pywhisper~=1.0.6
+static-ffmpeg==2.3
+flask
