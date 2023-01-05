@@ -20,11 +20,15 @@ The step-by-step flow for the scripts are:
 
 ##  Usage
 
+Navigate to the application directory and run the below commands:
+
 `python3 -m venv venv` creates a virtual environment
 
 `source venv/bin/activate` activates the virtual environment
 
 `python3 -m pip install -r requirements.txt` install all the libraries used in the application
+
+`pip3 install .` to install the application
 
 To check the version:
 `yt2btc --version` view the application version
