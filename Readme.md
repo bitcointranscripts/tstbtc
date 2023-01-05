@@ -35,7 +35,7 @@ To check the version:
 
 `yt2btc --help` view the application help
 
-`yt2btc -y {video_id} -t {title}` create video transcript supplying the id of the YouTube video and the source/year
+`yt2btc {video_id} {directory}` create video transcript supplying the id of the YouTube video and the source/year
 
 ## OTHER REQUIREMENTS
 

@@ -24,19 +24,19 @@ def print_version(ctx, param, value):
 
 
 @click.command()
-@click.option('-y', '--youtube_id', type=str, help='youtube video id')
-@click.option('-t', '--title', type=str, help='the transcription title')
+@click.argument('media', nargs=1)
+@click.argument('loc', nargs=1)
 @click.option('--version',  is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
 def add(
-        youtube_id: str,
-        title: str
+        media: str,
+        loc: str
 ) -> None:
-    """Add a transcription"""
-    file_name = title.replace("/", "-")
+    """Supply a YouTube video id and directory for transcription"""
+    file_name = loc.replace("/", "-")
     file_name_with_ext = file_name + '.md'
 
-    url = "https://www.youtube.com/watch?v=" + youtube_id
+    url = "https://www.youtube.com/watch?v=" + media
     result = application.convert(url, 'tiny.en')
 
     query_string = urllib.parse.urlencode({"format": "json", "url": url})

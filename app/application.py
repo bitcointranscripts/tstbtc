@@ -62,7 +62,6 @@ def convert(link, model):
     try:
         mymodel = pywhisper.load_model(model)
         result = mymodel.transcribe(filename[:-4] + ".mp3")
-        print(result["text"])
         result = result["text"]
         os.remove(filename)
         os.remove(filename[:-4] + ".mp3")
