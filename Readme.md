@@ -27,9 +27,11 @@ The step-by-step flow for the scripts are:
 `python3 -m pip install -r requirements.txt` install all the libraries used in the application
 
 To check the version:
-`python -m yttbtc -v` view the application version
+`yt2btc --version` view the application version
 
-`python3 -m yttbtc yt2btc {video_id} {file_name}` create video transcript supplying the id of the YouTube video and the source/year
+`yt2btc --help` view the application help
+
+`yt2btc -y {video_id} -t {title}` create video transcript supplying the id of the YouTube video and the source/year
 
 ## OTHER REQUIREMENTS
 
