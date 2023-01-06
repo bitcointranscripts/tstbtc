@@ -58,7 +58,7 @@ def convert(link, model):
         os.remove(filename)
         os.remove(filename[:-4] + ".mp3")
         print("Removed video and audio files")
-        return result
+        return result, filename
     except Exception as e:
         print("Error transcribing audio to text")
         print(e)
