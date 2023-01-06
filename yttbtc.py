@@ -8,8 +8,6 @@ import json
 from app import __version__, __app_name__
 
 session = HTMLSession()
-os.environ["IMAGEIO_FFMPEG_EXE"] = "/usr/bin/ffmpeg"
-
 
 @click.group()
 def cli():
@@ -26,10 +24,10 @@ def print_version(ctx, param, value):
 @click.command()
 @click.argument('media', nargs=1)
 @click.argument('loc', nargs=1)
-@click.option('-m', '--model', type=click.Choice(['tiny', 'base', 'small', 'medium']), default = 'tiny',
-    help='Options for transcription model'
-)
-@click.option('--version',  is_flag=True, callback=print_version,
+@click.option('-m', '--model', type=click.Choice(['tiny', 'base', 'small', 'medium']), default='tiny',
+              help='Options for transcription model'
+              )
+@click.option('--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
 def add(
         media: str,
@@ -63,6 +61,5 @@ def add(
 
     absolute_path = os.path.abspath(file_name_with_ext)
 
-    """ INITIALIZE AND OPEN A PR"""
-    print("Initializing git \n")
+    """ INITIALIZE GIT AND OPEN A PR"""
     subprocess.call(['bash', 'github.sh', file_name_with_ext, file_name, absolute_path])
