@@ -49,6 +49,7 @@ def add(
         opf.write(transcribed_text + '\n')
 
     absolute_path = os.path.abspath(file_name_with_ext)
+    branch_name = loc.replace("/", "-")
 
     """ INITIALIZE GIT AND OPEN A PR"""
-    subprocess.call(['bash', 'github.sh', file_name_with_ext, file_name, absolute_path, loc])
+    subprocess.call(['bash', 'github.sh', absolute_path, loc, branch_name])
