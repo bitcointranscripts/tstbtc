@@ -41,9 +41,9 @@ def add(
     file_name_with_ext = file_name + '.md'
     meta_data = '---\n' \
                 f'title: {video_title} ' + '\n' \
-                                     f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
-                                     f'media: {url}\n' \
-                                     '---\n'
+                f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
+                f'media: {url}\n' \
+                '---\n'
     with open(file_name_with_ext, 'a') as opf:
         opf.write(meta_data + '\n')
         opf.write(transcribed_text + '\n')
