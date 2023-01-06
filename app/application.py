@@ -1,18 +1,11 @@
 """This module provides the transcript cli."""
 # app/application.py
 
-
-import typer
-from requests_html import HTMLSession
 import pytube
 from moviepy.editor import VideoFileClip
 import pywhisper
 import os
 import static_ffmpeg
-
-
-session = HTMLSession()
-os.environ["IMAGEIO_FFMPEG_EXE"] = "/usr/bin/ffmpeg"
 
 
 def download_video(url):
@@ -31,7 +24,6 @@ def convert_to_mp3(filename):
 def AudiotoText(filename):
     model = pywhisper.load_model("base")
     result = model.transcribe(filename)
-    print(result["text"])
     sonuc = result["text"]
     return sonuc
 
@@ -66,8 +58,7 @@ def convert(link, model):
         os.remove(filename)
         os.remove(filename[:-4] + ".mp3")
         print("Removed video and audio files")
-        print("Done!")
-        return result
+        return result, filename
     except Exception as e:
         print("Error transcribing audio to text")
         print(e)
