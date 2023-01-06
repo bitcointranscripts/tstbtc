@@ -40,7 +40,7 @@ def add(
     file_name = video_title.replace(' ', '-')
     file_name_with_ext = file_name + '.md'
     meta_data = '---\n' \
-                f'title: {file_name} ' + '\n' \
+                f'title: {video_title} ' + '\n' \
                                      f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
                                      f'media: {url}\n' \
                                      '---\n'
@@ -51,4 +51,4 @@ def add(
     absolute_path = os.path.abspath(file_name_with_ext)
 
     """ INITIALIZE GIT AND OPEN A PR"""
-    subprocess.call(['bash', 'github.sh', file_name_with_ext, file_name, absolute_path])
+    subprocess.call(['bash', 'github.sh', file_name_with_ext, file_name, absolute_path, loc])

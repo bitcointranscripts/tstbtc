@@ -20,9 +20,15 @@ else
   git checkout -b ${2}
 fi
 
-mv ${3} .
+if [ ! -d "./${4}" ]; then 
 
-git add "$1" && git commit -m 'initial transcription using yt2btc tool'
+  mkdir -p ${4} 
+  
+fi
+
+mv ${3} "./${4}"
+
+git add "./${4}/" && git commit -m 'initial transcription using yt2btc tool'
 
 gh repo set-default ${USERNAME}/bitcointranscripts
 
