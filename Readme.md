@@ -26,9 +26,9 @@ Navigate to the application directory and run the below commands:
 
 `source venv/bin/activate` activates the virtual environment
 
-`python3 -m pip install -r requirements.txt` install all the libraries used in the application
+<!-- `python3 -m pip install -r requirements.txt --use-pep517` install all the libraries used in the application -->
 
-`pip3 install .` to install the application
+`pip3 install . --use-pep517` to install the application
 
 To check the version:
 `yt2btc --version` view the application version
