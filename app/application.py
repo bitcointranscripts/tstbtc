@@ -6,6 +6,7 @@ from moviepy.editor import VideoFileClip
 import pywhisper
 import os
 import static_ffmpeg
+from app import __version__
 
 
 def download_video(url):
@@ -63,3 +64,19 @@ def convert(link, model):
         print("Error transcribing audio to text")
         print(e)
         return
+
+
+def write_to_file(result, url):
+    transcribed_text = result[0]
+    video_title = result[1][:-4]
+    file_name = video_title.replace(' ', '-')
+    file_name_with_ext = file_name + '.md'
+    meta_data = '---\n' \
+                f'title: {video_title} ' + '\n' \
+                                           f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
+                                           f'media: {url}\n' \
+                                           '---\n'
+    with open(file_name_with_ext, 'a') as opf:
+        opf.write(meta_data + '\n')
+        opf.write(transcribed_text + '\n')
+    return file_name_with_ext
