@@ -26,9 +26,25 @@ if [ ! -d "./${2}" ]; then
   
 fi
 
+IFS=/ read -a dirs <<< ${2}
+IFS=' ' read -a sub_dirs <<< ${dirs[0]}
+
+cd ${sub_dirs[0]}
+if [ ! -f ./_index.md ]; then
+  echo -e "---\ntitle: ${sub_dirs[0]}\n---\n\n{{< childpages >}}" >> _index.md
+fi
+
+cd ${sub_dirs[1]}
+
+if [ ! -f ./_index.md ]; then
+  echo -e "---\ntitle: ${dirs[0]}\n---\n\n{{< childpages >}}" >> _index.md
+fi
+ 
+cd ../..
+
 mv "${1}" "./${2}"
 
-git add "./${2}/" && git commit -m 'initial transcription using yt2btc tool'
+git add . && git commit -m 'initial transcription using yt2btc tool'
 
 gh repo set-default "${USERNAME}"/bitcointranscripts
 
