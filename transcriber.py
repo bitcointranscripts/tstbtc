@@ -23,19 +23,21 @@ def print_version(ctx, param, value):
 @click.option('-m', '--model', type=click.Choice(['tiny', 'base', 'small', 'medium']), default='tiny',
               help='Options for transcription model'
               )
+@click.option('-t', '--title', type=str, help="Supply transcribed file title in 'quotes'")
 @click.option('--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
 def add(
         media: str,
         loc: str,
-        model: str
+        model: str,
+        title: str,
 ) -> None:
     """Supply a YouTube video id and directory for transcription"""
 
     url = "https://www.youtube.com/watch?v=" + media
     selected_model = model + '.en'
     result = application.convert(url, selected_model)
-    file_name_with_ext = application.write_to_file(result, url)
+    file_name_with_ext = application.write_to_file(result, url, title)
 
     absolute_path = os.path.abspath(file_name_with_ext)
     branch_name = loc.replace("/", "-")
