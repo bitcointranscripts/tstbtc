@@ -1,8 +1,8 @@
-"""Top-level package for yt2btc."""
+"""Top-level package for tstbtc."""
 # yttbtc/__init__.py
 
-__app_name__ = "yttbtc"
-__version__ = "0.1.0"
+__app_name__ = "tstbtc"
+__version__ = "1.0.0"
 
 (
     SUCCESS,

@@ -1,4 +1,4 @@
-# YTB_TO_BTCSCRIPT
+# TRANSCRIBER TO BITCOIN TRANSCRIPT
 
 This project converts YouTube videos to bitcoinscripts and opens a PR on [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts) repo. It uses `youwhisper` to transcribe the videos, then collects meta data about the video using `requests_html`. It then uses the supplied cli arguments and file to open a Pull Request on the [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts) repo.
 
@@ -26,16 +26,16 @@ Navigate to the application directory and run the below commands:
 
 `source venv/bin/activate` activates the virtual environment
 
-<!-- `python3 -m pip install -r requirements.txt --use-pep517` install all the libraries used in the application -->
-
 `pip3 install . --use-pep517` to install the application
 
 To check the version:
-`yt2btc --version` view the application version
+`tsb --version` view the application version
 
-`yt2btc --help` view the application help
+`tsb --help` view the application help
 
-`yt2btc {video_id} {directory}` create video transcript supplying the id of the YouTube video and the source/year
+`tsb {video_id} {directory}` create video transcript supplying the id of the YouTube video and the source/year
+
+`pip3 uninstall tstbtc` to uninstall the application
 
 ## OTHER REQUIREMENTS
 
@@ -56,3 +56,6 @@ To check the version:
      - for Mac Os users, run `brew install ffmpeg`
 
      - for other users, follow the instruction on their [site](https://ffmpeg.org/) to install
+
+##  License
+Transcriber to Bitcoin Transcript is released under the terms of the MIT license. See [LICENSE](LICENSE) for more information or see https://opensource.org/licenses/MIT.

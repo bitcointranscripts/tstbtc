@@ -6,16 +6,16 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
 setup(
-    name='yt2btc',
-    version='0.1.0',
+    name='tstbtc',
+    version='1.0.0',
     author='Peter Tyonum',
     author_email='withtvpeter@gmail.com',
     license='MIT',
-    description='transcribes youtube videos to bitcointranscript',
+    description='transcribes youtube videos/media to bitcointranscript',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/tvpeter/yt2btc',
-    py_modules=['yttbtc'],
+    py_modules=['transcriber'],
     packages=find_packages(),
     install_requires=[requirements],
     python_requires='>=3.9',
@@ -26,6 +26,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        yt2btc=yttbtc:add
+        tstbtc=transcriber:add
     '''
 )
