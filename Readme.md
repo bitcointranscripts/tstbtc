@@ -29,11 +29,11 @@ Navigate to the application directory and run the below commands:
 `pip3 install . --use-pep517` to install the application
 
 To check the version:
-`tsb --version` view the application version
+`tstbtc --version` view the application version
 
-`tsb --help` view the application help
+`tstbtc --help` view the application help
 
-`tsb {video_id} {directory}` create video transcript supplying the id of the YouTube video and the source/year
+`tstbtc {video_id} {directory}` create video transcript supplying the id of the YouTube video and the source/year
 
 `pip3 uninstall tstbtc` to uninstall the application
 
