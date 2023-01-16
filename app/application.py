@@ -11,7 +11,7 @@ from app import __version__
 
 def download_video(url):
     video = pytube.YouTube(url)
-    stream = video.streams.get_by_itag(18)
+    stream = video.streams.get_by_itag(160)
     stream.download()
     return stream.default_filename
 
@@ -79,12 +79,12 @@ def write_to_file(result, url, title, date):
     meta_data = '---\n' \
                 f'title: {file_title} ' + '\n' \
                 f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
-                f'media: {url}\n' 
+                f'media: {url}\n'
     if date:
-        meta_data = meta_data + f'date: {date}\n' 
+        meta_data = meta_data + f'date: {date}\n'
 
     meta_data = meta_data + '---\n'
-    
+
     with open(file_name_with_ext, 'a') as opf:
         opf.write(meta_data + '\n')
         opf.write(transcribed_text + '\n')
