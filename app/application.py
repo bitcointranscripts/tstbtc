@@ -11,7 +11,7 @@ from app import __version__
 
 def download_video(url):
     video = pytube.YouTube(url)
-    stream = video.streams.get_by_itag(160)
+    stream = video.streams.get_by_itag(18)
     stream.download()
     return stream.default_filename
 
@@ -43,7 +43,8 @@ def convert(link, model):
     try:
         filename = download_video(link)
         print("Downloaded video as " + filename)
-    except:
+    except Exception as e:
+        print(e)
         print("Not a valid link..")
         return
     try:
