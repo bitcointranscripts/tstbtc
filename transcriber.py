@@ -26,6 +26,11 @@ def print_version(ctx, param, value):
               )
 @click.option('-t', '--title', type=str, help="Supply transcribed file title in 'quotes'")
 @click.option('-d', '--date', type=str, help="Supply the event date in format 'yyyy-mm-dd'")
+@click.option('-T', '--tags', type=str, help="Supply the tags for the transcript in 'quotes' and separated by commas")
+@click.option('-s', '--speakers', type=str, help="Supply the speakers for the transcript in 'quotes' and separated by "
+                                                 "commas")
+@click.option('-c', '--category', type=str, help="Supply the category for the transcript in 'quotes' and separated by "
+                                                 "commas")
 @click.option('--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
 def add(
@@ -33,7 +38,10 @@ def add(
         loc: str,
         model: str,
         title: str,
-        date: str
+        date: str,
+        tags: str,
+        speakers: str,
+        category: str,
 ) -> None:
     """Supply a YouTube video id and directory for transcription"""
 
@@ -50,7 +58,7 @@ def add(
             return
 
     result = application.convert(url, selected_model)
-    file_name_with_ext = application.write_to_file(result, url, title, event_date)
+    file_name_with_ext = application.write_to_file(result, url, title, event_date, tags, category, speakers)
 
     absolute_path = os.path.abspath(file_name_with_ext)
     branch_name = loc.replace("/", "-")
