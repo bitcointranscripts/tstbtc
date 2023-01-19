@@ -46,6 +46,11 @@ def add(
     """Supply a YouTube video id and directory for transcription"""
 
     url = "https://www.youtube.com/watch?v=" + media
+    videos = [url]
+    if media.startswith("PL") or media.startswith("UU") or media.startswith("FL") or media.startswith("RD"):
+        url = "https://www.youtube.com/playlist?list=" + media
+        videos = application.get_playlist_videos(url)
+        print("Playlist detected")
 
     selected_model = model + '.en'
 
@@ -56,12 +61,18 @@ def add(
         except:
             print("Supplied date is invalid")
             return
+    print("What is your github username?")
+    username = input()
+    for video in videos:
+        print("Transcribing video: " + video)
+        result = application.convert(video, selected_model)
+        # print(result)
+        file_name_with_ext = application.write_to_file(result, video, title, event_date, tags, category, speakers)
 
-    result = application.convert(url, selected_model)
-    file_name_with_ext = application.write_to_file(result, url, title, event_date, tags, category, speakers)
-
-    absolute_path = os.path.abspath(file_name_with_ext)
-    branch_name = loc.replace("/", "-")
+        absolute_path = os.path.abspath(file_name_with_ext)
+        branch_name = loc.replace("/", "-")
+        subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name])
 
     """ INITIALIZE GIT AND OPEN A PR"""
-    subprocess.call(['bash', 'github.sh', absolute_path, loc, branch_name])
+    branch_name = loc.replace("/", "-")
+    subprocess.call(['bash', 'github.sh', branch_name, username])
