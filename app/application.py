@@ -30,7 +30,6 @@ def download_video(url):
         return name + ".mp4"
     except Exception as e:
         print("Error downloading video")
-        print(os.path.exists(name + '.description'))
         if name and os.path.exists(name + '.description'):
             os.remove(name + '.description')
         print(e)
@@ -60,7 +59,7 @@ def read_description(description_file):
     return list_of_chapters
 
 
-def write_chapters_file(chapter_file: str, chapter_list: tuple) -> None:
+def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
     # Write out the chapter file based on simple MP4 format (OGM)
     with open(chapter_file, 'w') as fo:
         for current_chapter in chapter_list:
@@ -99,12 +98,10 @@ def convert_video_to_mp3(filename):
     print(filename[:-4] + ".mp3")
     clip.audio.write_audiofile(filename[:-4] + ".mp3")
     clip.close()
-    os.remove(filename)
 
 
 def convert_wav_to_mp3(filename):
     subprocess.call(['ffmpeg', '-i', filename, filename[:-4] + ".mp3"])
-    os.remove(filename)
     return filename[:-4] + ".mp3"
 
 
@@ -156,7 +153,6 @@ def process_mp3(filename, model):
         mymodel = pywhisper.load_model(model)
         result = mymodel.transcribe(filename[:-4] + ".mp3")
         result = result["text"]
-        os.remove(filename[:-4] + ".mp3")
         print("Removed video and audio files")
         return result
     except Exception as e:
@@ -229,9 +225,135 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
     return file_name_with_ext
 
 
-def create_pr(result, video, title, event_date, tags, category, speakers, loc, username, curr_time, video_title):
-    file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title, username)
+def get_md_file_path(result, video, title, event_date, tags, category, speakers, loc, username, curr_time,
+                     video_title):  # todo rename function
+    file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title,
+                                       username)
 
     absolute_path = os.path.abspath(file_name_with_ext)
+    return absolute_path
+
+
+def initialize_repo(absolute_path, loc, username, curr_time):
     branch_name = loc.replace("/", "-")
     subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name, username, curr_time])
+
+
+def get_username():
+    if os.path.isfile(".username"):
+        with open(".username", "r") as f:
+            username = f.read()
+            f.close()
+    else:
+        print("What is your github username?")
+        username = input()
+        with open(".username", "w") as f:
+            f.write(username)
+            f.close()
+    return username
+
+
+def check_source_type(source):
+    if source.startswith("https://www.youtube.com"):
+        if source.find("list=") != -1:
+            return "playlist"
+        else:
+            return "video"
+    elif source.endswith(".mp3") or source.endswith(".wav"):
+        return "audio"
+    elif check_if_playlist(source):
+        return "playlist"
+    else:
+        return "video"
+
+
+def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, curr_time):
+    print("audio file detected")
+    if title is None:
+        print("Error: Please supply a title for the audio file")
+        return None
+    # process audio file
+    filename = get_audio_file(source, title)
+    print("processing audio file", filename)
+    if filename is None:
+        print("File not found")
+        return
+    if filename.endswith('wav'):
+        filename = convert_wav_to_mp3(filename)
+        os.remove(filename[:-4] + '.wav')
+    result = process_mp3(filename, model)
+    os.remove(filename[:-4] + ".mp3")
+    absolute_path = get_md_file_path(result, source, title, event_date, tags, category, speakers, loc, username,
+                                     curr_time,
+                                     filename[:-4])
+    initialize_repo(absolute_path, loc, username, curr_time)
+    return filename
+
+
+def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, curr_time):
+    print("Playlist detected")
+    url = "https://www.youtube.com/playlist?list=" + source
+    videos = get_playlist_videos(url)
+    if videos is None:
+        print("Playlist is empty")
+        return
+
+    selected_model = model + '.en'
+    filename = ""
+
+    for video in videos:
+        filename = process_video(video, title, event_date, tags, category, speakers, loc, selected_model, username,
+                                 curr_time)
+    return filename
+
+
+def process_video(video, title, event_date, tags, category, speakers, loc, model, username, curr_time):
+    result = ""
+    print("Transcribing video: " + video)
+    filename = download_video(video)
+    print()
+    print()
+    if filename is None:  # todo add creation check
+        print("File not found")
+        return None
+    chapters = read_description(filename[:-4] + '.description')
+    if len(chapters) > 0:
+        print("Chapters detected")
+        write_chapters_file(filename[:-4] + '.chapters', chapters)
+        split_mp4(chapters, filename, filename[:-4])
+        initialize()
+        for current_index, chapter in enumerate(chapters):
+            print(f"Processing chapter {chapter[2]} {current_index + 1} of {len(chapters)}")
+            convert(f'{filename[:-4]} - ({current_index}).mp4')
+            os.remove(f'{filename[:-4]} - ({current_index}).mp4')
+            temp_filename = f'{filename[:-4]} - ({current_index}).mp4'
+            temp_res = process_mp3(temp_filename, model)
+            os.remove(temp_filename[:-4] + ".mp3")
+            result = result + "## " + chapter[2] + "\n\n" + temp_res + "\n\n"
+            print()
+        os.remove(filename)
+        os.remove(filename[:-4] + '.chapters')
+    else:
+        convert(filename)
+        os.remove(filename)
+        result = process_mp3(filename, model)
+        os.remove(filename[:-4] + ".mp3")
+    absolute_path = get_md_file_path(result, video, title, event_date, tags, category, speakers, loc, username,
+                                     curr_time,
+                                     filename[:-4])
+    initialize_repo(absolute_path, loc, username, curr_time)
+    os.remove(filename[:-4] + '.description')
+    return filename
+
+
+def process_source(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, source_type):
+    if source_type == 'audio':
+        filename = process_audio(source, title, event_date, tags, category, speakers, loc, model, username,
+                                 curr_time)
+    elif source_type == 'playlist':
+        filename = process_videos(source, title, event_date, tags, category, speakers, loc, model, username,
+                                  curr_time)
+    else:
+        filename = process_video(source, title, event_date, tags, category, speakers, loc, model, username,
+                                 curr_time)
+    return filename
