@@ -21,7 +21,7 @@ else
 fi
 # check if the current branch is master else checkout master
 git_branch="$(git rev-parse --abbrev-ref HEAD)"
-if [ "$git_branch" != "master" ]; then
+if [ "${git_branch}" != "master" ]; then
   git checkout master
 fi
 
@@ -33,6 +33,8 @@ if [ "$(git show-ref --quiet refs/heads/${5}-${3})" ]; then
 else
   git checkout -b "${5}-${3}"
 fi
+
+echo "switched to branch ${5}-${3}"
 
 # check if the loc exists or not
 if [ ! -d "./${2}" ]; then
@@ -55,7 +57,7 @@ cd "${dirs[1]}" || return #yt2btc
 
 # check if the index file exists
 if [ ! -f ./_index.md ]; then
-  echo -e "---\ntitle: ${dirs[0]}\n---\n\n{{< childpages >}}" >> _index.md
+  echo -e "---\ntitle: ${dirs[1]}\n---\n\n{{< childpages >}}" >> _index.md
 fi
 
 # goto the original directory

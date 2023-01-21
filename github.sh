@@ -4,6 +4,7 @@ git checkout "${3}-${1}"
 git add . && git commit -m 'initial transcription using tstbtc tool'
 git push origin "${3}-${1}"
 
+echo "Setting default repo to ${2}/bitcointranscripts"
 # set the default repo to the fork
 gh repo set-default "${2}"/bitcointranscripts
 
