@@ -20,7 +20,7 @@ def print_version(ctx, param, value):
 
 
 @click.command()
-@click.argument('media', nargs=1)
+@click.argument('source', nargs=1)
 @click.argument('loc', nargs=1)
 @click.option('-m', '--model', type=click.Choice(['tiny', 'base', 'small', 'medium']), default='tiny',
               help='Options for transcription model'
@@ -35,7 +35,7 @@ def print_version(ctx, param, value):
 @click.option('-v', '--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
 def add(
-        media: str,
+        source: str,
         loc: str,
         model: str,
         title: str,
@@ -46,34 +46,56 @@ def add(
 ) -> None:
     """Supply a YouTube video id and directory for transcription"""
 
-    url = "https://www.youtube.com/watch?v=" + media
-    videos = [url]
-    if media.startswith("PL") or media.startswith("UU") or media.startswith("FL") or media.startswith("RD"):
-        url = "https://www.youtube.com/playlist?list=" + media
-        videos = application.get_playlist_videos(url)
-        print("Playlist detected")
-
-    selected_model = model + '.en'
-
-    event_date = str()
-    if date:
-        try:
-            event_date = datetime.strptime(date, '%Y-%m-%d').date()
-        except:
-            print("Supplied date is invalid")
-            return
     print("What is your github username?")
     username = input()
     curr_time = str(round(time.time() * 1000))
-    for video in videos:
-        print("Transcribing video: " + video)
-        result = application.convert(video, selected_model)
-        # print(result)
-        file_name_with_ext = application.write_to_file(result, video, title, event_date, tags, category, speakers)
+    if source.endswith('.mp3') or source.endswith('.wav'):
+        print("audio file detected")
+        if title is None:
+            print("Please supply a title for the audio file")
+            title = str(input())
+        # process audio file
+        filename = application.get_audio_file(source, title)
+        print("processing audio file", filename)
+        if filename is None:
+            print("File not found")
+            return
+        if filename.endswith('wav'):
+            filename = application.convert_wav_to_mp3(filename)
+        result = application.process_mp3(filename, model)
+        application.create_pr(result, source, title, date, tags, category, speakers, loc, username, curr_time,
+                              filename[:-4])
+    else:
+        # process video or a playlist
+        url = "https://www.youtube.com/watch?v=" + source
+        videos = [url]
+        if application.check_if_playlist(source):
+            print("Playlist detected")
+            url = "https://www.youtube.com/playlist?list=" + source
+            videos = application.get_playlist_videos(url)
+            if videos is None:
+                print("Playlist is empty")
+                return
 
-        absolute_path = os.path.abspath(file_name_with_ext)
-        branch_name = loc.replace("/", "-")
-        subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name, username, curr_time])
+        selected_model = model + '.en'
+
+        event_date = str()
+        if date:
+            try:
+                event_date = datetime.strptime(date, '%Y-%m-%d').date()
+            except:
+                print("Supplied date is invalid")
+                return
+        for video in videos:
+            print("Transcribing video: " + video)
+            filename = application.download_video(video)
+            if filename is None:
+                print("File not found")
+                return
+            application.convert(filename)
+            result = application.process_mp3(filename, selected_model)
+            application.create_pr(result, video, title, event_date, tags, category, speakers, loc, username, curr_time,
+                                  filename[:-4])
     """ INITIALIZE GIT AND OPEN A PR"""
     branch_name = loc.replace("/", "-")
     subprocess.call(['bash', 'github.sh', branch_name, username, curr_time])
