@@ -31,7 +31,7 @@ def print_version(ctx, param, value):
                                                  "commas")
 @click.option('-c', '--category', type=str, help="Supply the category for the transcript in 'quotes' and separated by "
                                                  "commas")
-@click.option('--version', is_flag=True, callback=print_version,
+@click.option('-v', '--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
 def add(
         media: str,
