@@ -4,6 +4,7 @@ import click
 from app import application
 from app import __version__, __app_name__
 from datetime import datetime
+import time
 
 
 @click.group()
@@ -63,6 +64,7 @@ def add(
             return
     print("What is your github username?")
     username = input()
+    curr_time = str(round(time.time() * 1000))
     for video in videos:
         print("Transcribing video: " + video)
         result = application.convert(video, selected_model)
@@ -71,8 +73,7 @@ def add(
 
         absolute_path = os.path.abspath(file_name_with_ext)
         branch_name = loc.replace("/", "-")
-        subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name])
-
+        subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name, username, curr_time])
     """ INITIALIZE GIT AND OPEN A PR"""
     branch_name = loc.replace("/", "-")
-    subprocess.call(['bash', 'github.sh', branch_name, username])
+    subprocess.call(['bash', 'github.sh', branch_name, username, curr_time])
