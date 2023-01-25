@@ -22,6 +22,11 @@ def convert_to_mp3(filename):
     clip.close()
 
 
+def get_playlist_videos(url):
+    videos = pytube.Playlist(url)
+    return videos
+
+
 def AudiotoText(filename):
     model = pywhisper.load_model("base")
     result = model.transcribe(filename)
