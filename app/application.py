@@ -67,19 +67,39 @@ def convert(link, model):
         return
 
 
-def write_to_file(result, url, title, date):
+def write_to_file(result, url, title, date, tags, category, speakers):
     transcribed_text = result[0]
     video_title = result[1][:-4]
     if title:
         file_title = title
     else:
         file_title = video_title
-
+    if tags is None:
+        tags = ""
+    if speakers is None:
+        speakers = ""
+    if category is None:
+        category = ""
+    tags = tags.strip()
+    tags = tags.split(",")
+    for i in range(len(tags)):
+        tags[i] = tags[i].strip()
+    speakers = speakers.strip()
+    speakers = speakers.split(",")
+    for i in range(len(speakers)):
+        speakers[i] = speakers[i].strip()
+    category = category.strip()
+    category = category.split(",")
+    for i in range(len(category)):
+        category[i] = category[i].strip()
     file_name = video_title.replace(' ', '-')
     file_name_with_ext = file_name + '.md'
     meta_data = '---\n' \
-                f'title: {file_title} ' + '\n' \
+                f'title: {file_title}\n' \
                 f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
+                f'tags: {tags}\n' \
+                f'categories: {category}\n' \
+                f'speakers: {speakers}\n' \
                 f'media: {url}\n'
     if date:
         meta_data = meta_data + f'date: {date}\n'
