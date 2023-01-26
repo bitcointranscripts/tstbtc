@@ -28,10 +28,10 @@ fi
 gh repo sync --branch master
 
 # create a new branch or checkout the branch if it exists
-if [ "$(git show-ref --quiet refs/heads/${3})" ]; then
-  git checkout "${3}"
+if [ "$(git show-ref --quiet refs/heads/${5}-${3})" ]; then
+  git checkout "${5}-${3}"
 else
-  git checkout -b "${3}"
+  git checkout -b "${5}-${3}"
 fi
 
 # check if the loc exists or not
