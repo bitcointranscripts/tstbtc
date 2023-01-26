@@ -2,4 +2,7 @@ pytube~=12.1.2
 moviepy~=1.0.3
 pywhisper~=1.0.6
 static-ffmpeg==2.3
-click
+click~=7.0
+requests~=2.22.0
+setuptools~=45.2.0
+clint~=0.5.1
