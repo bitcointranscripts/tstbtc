@@ -35,6 +35,8 @@ To check the version:
 
 `tstbtc {video_id} {directory}` create video transcript supplying the id of the YouTube video and the source/year
 
+`tstbtc {audio_url} {directory} --title {title}` create audio transcript supplying the url of the audio, the source/year and the title of the audio
+
 `pip3 uninstall tstbtc` to uninstall the application
 
 ## OTHER REQUIREMENTS
