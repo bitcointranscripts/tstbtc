@@ -120,4 +120,4 @@ def add(
 
     """ INITIALIZE GIT AND OPEN A PR"""
     branch_name = loc.replace("/", "-")
-    subprocess.call(['bash', 'github.sh', branch_name, username, curr_time])
+    subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename[:-4]])
