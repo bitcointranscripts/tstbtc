@@ -1,5 +1,5 @@
-import subprocess
 import os
+import subprocess
 import click
 from app import application
 from app import __version__, __app_name__
@@ -49,6 +49,14 @@ def add(
     print("What is your github username?")
     username = input()
     curr_time = str(round(time.time() * 1000))
+
+    event_date = str()
+    if date:
+        try:
+            event_date = datetime.strptime(date, '%Y-%m-%d').date()
+        except:
+            print("Supplied date is invalid")
+            return
     if source.endswith('.mp3') or source.endswith('.wav'):
         print("audio file detected")
         if title is None:
@@ -63,7 +71,7 @@ def add(
         if filename.endswith('wav'):
             filename = application.convert_wav_to_mp3(filename)
         result = application.process_mp3(filename, model)
-        application.create_pr(result, source, title, date, tags, category, speakers, loc, username, curr_time,
+        application.create_pr(result, source, title, event_date, tags, category, speakers, loc, username, curr_time,
                               filename[:-4])
     else:
         # process video or a playlist
@@ -79,23 +87,37 @@ def add(
 
         selected_model = model + '.en'
 
-        event_date = str()
-        if date:
-            try:
-                event_date = datetime.strptime(date, '%Y-%m-%d').date()
-            except:
-                print("Supplied date is invalid")
-                return
         for video in videos:
+            result = ""
             print("Transcribing video: " + video)
             filename = application.download_video(video)
+            print()
+            print()
             if filename is None:
                 print("File not found")
                 return
-            application.convert(filename)
-            result = application.process_mp3(filename, selected_model)
+            chapters = application.read_description(filename[:-4] + '.description')
+            if len(chapters) > 0:
+                print("Chapters detected")
+                application.write_chapters_file(filename[:-4] + '.chapters', chapters)
+                application.split_mp4(chapters, filename, filename[:-4])
+                application.initialize()
+                for current_index, chapter in enumerate(chapters):
+                    print(f"Processing chapter {chapter[2]} {current_index + 1} of {len(chapters)}")
+                    application.convert(f'{filename[:-4]} - ({current_index}).mp4')
+                    temp_filename = f'{filename[:-4]} - ({current_index}).mp4'
+                    temp_res = application.process_mp3(temp_filename, selected_model)
+                    result = result + "## " + chapter[2] + "\n\n" + temp_res + "\n\n"
+                    print()
+                os.remove(filename)
+                os.remove(filename[:-4] + '.chapters')
+            else:
+                application.convert(filename)
+                result = application.process_mp3(filename, selected_model)
             application.create_pr(result, video, title, event_date, tags, category, speakers, loc, username, curr_time,
                                   filename[:-4])
+            os.remove(filename[:-4] + '.description')
+
     """ INITIALIZE GIT AND OPEN A PR"""
     branch_name = loc.replace("/", "-")
     subprocess.call(['bash', 'github.sh', branch_name, username, curr_time])
