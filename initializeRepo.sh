@@ -41,27 +41,24 @@ if [ ! -d "./${2}" ]; then
   mkdir -p "${2}"
 fi
 
+temp=${PWD}
+
 #discover the directories
 IFS=/ read -ra dirs <<< "${2}"
 
-# switch to the first directory
-cd "${dirs[0]}" || return #tvpeter
+for item in "${dirs[@]}"
+do
+    cd "${item}" || return #tvpeter
 
-# check if the index file exists
-if [ ! -f ./_index.md ]; then
-  echo -e "---\ntitle: ${dirs[0]}\n---\n\n{{< childpages >}}" >> _index.md
-fi
+    # check if the index file exists
+    if [ ! -f ./_index.md ]; then
+      echo -e "---\ntitle: ${item}\n---\n\n{{< childpages >}}" >> _index.md
+    fi
 
-# goto the second directory
-cd "${dirs[1]}" || return #yt2btc
-
-# check if the index file exists
-if [ ! -f ./_index.md ]; then
-  echo -e "---\ntitle: ${dirs[1]}\n---\n\n{{< childpages >}}" >> _index.md
-fi
+done
 
 # goto the original directory
-cd ../..
+cd "${temp}" || return
 
 # move the transcript to the directory
 mv "${1}" "./${2}"
