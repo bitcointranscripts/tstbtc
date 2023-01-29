@@ -27,7 +27,7 @@ def download_video(url):
         stream = video.streams.get_by_itag(18)
         stream.download()
         os.rename(stream.default_filename, name + '.mp4')
-        return name+".mp4"
+        return name + ".mp4"
     except Exception as e:
         print("Error downloading video")
         print(os.path.exists(name + '.description'))
@@ -190,38 +190,37 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
         file_title = title
     else:
         file_title = video_title
-    if tags is None:
-        tags = ""
-    if speakers is None:
-        speakers = ""
-    if category is None:
-        category = ""
-    tags = tags.strip()
-    tags = tags.split(",")
-    for i in range(len(tags)):
-        tags[i] = tags[i].strip()
-    speakers = speakers.strip()
-    speakers = speakers.split(",")
-    for i in range(len(speakers)):
-        speakers[i] = speakers[i].strip()
-    category = category.strip()
-    category = category.split(",")
-    for i in range(len(category)):
-        category[i] = category[i].strip()
-    print(video_title)
-    file_name = video_title.replace(' ', '-')
-    file_name_with_ext = file_name + '.md'
     meta_data = '---\n' \
                 f'title: {file_title}\n' \
                 f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
-                f'tags: {tags}\n' \
-                f'categories: {category}\n' \
-                f'speakers: {speakers}\n' \
                 f'media: {url}\n'
-    if date:
-        meta_data = meta_data + f'date: {date}\n'
+    if tags:
+        tags = tags.strip()
+        tags = tags.split(",")
+        for i in range(len(tags)):
+            tags[i] = tags[i].strip()
+        meta_data += f'tags: {tags}\n'
+    if speakers:
+        speakers = speakers.strip()
+        speakers = speakers.split(",")
+        for i in range(len(speakers)):
+            speakers[i] = speakers[i].strip()
+        meta_data += f'speakers: {speakers}\n'
+    if category:
+        category = category.strip()
+        category = category.split(",")
+        for i in range(len(category)):
+            category[i] = category[i].strip()
+        meta_data += f'categories: {category}\n'
 
-    meta_data = meta_data + '---\n'
+    print(video_title)
+    file_name = video_title.replace(' ', '-')
+    file_name_with_ext = file_name + '.md'
+
+    if date:
+        meta_data = meta_data + f'date: {date}\n\n'
+
+    meta_data += '---\n'
 
     with open(file_name_with_ext, 'a') as opf:
         opf.write(meta_data + '\n')
