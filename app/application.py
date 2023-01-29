@@ -226,6 +226,7 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
     with open(file_name_with_ext, 'a') as opf:
         opf.write(meta_data + '\n')
         opf.write(transcribed_text + '\n')
+        opf.close()
     return file_name_with_ext
 
 
