@@ -1,7 +1,7 @@
 cd bitcointranscripts || exit
 git checkout "${3}-${1}"
 # add the transcript to the repo and commit
-git add . && git commit -m 'initial transcription using tstbtc tool'
+git add . && git commit -m "added ${4}"
 git push origin "${3}-${1}"
 
 echo "Setting default repo to ${2}/bitcointranscripts"
