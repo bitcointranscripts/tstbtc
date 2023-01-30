@@ -49,7 +49,7 @@ def add(
     print("What is your github username?")
     username = input()
     curr_time = str(round(time.time() * 1000))
-
+    loc = loc.strip("/")
     event_date = str()
     if date:
         try:
