@@ -45,9 +45,16 @@ def add(
         category: str,
 ) -> None:
     """Supply a YouTube video id and directory for transcription"""
-
-    print("What is your github username?")
-    username = input()
+    if os.path.isfile(".username"):
+        with open(".username", "r") as f:
+            username = f.read()
+            f.close()
+    else:
+        print("What is your github username?")
+        username = input()
+        with open(".username", "w") as f:
+            f.write(username)
+            f.close()
     curr_time = str(round(time.time() * 1000))
     loc = loc.strip("/")
     event_date = str()
