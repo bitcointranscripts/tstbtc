@@ -184,7 +184,7 @@ def convert(filename):
     return filename
 
 
-def write_to_file(result, url, title, date, tags, category, speakers, video_title):
+def write_to_file(result, url, title, date, tags, category, speakers, video_title, username):
     transcribed_text = result
     if title:
         file_title = title
@@ -192,7 +192,7 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
         file_title = video_title
     meta_data = '---\n' \
                 f'title: {file_title}\n' \
-                f'transcript_by: youtube_to_bitcoin_transcript_v_{__version__}\n' \
+                f'transcript_by: {username} via TBTBTC v{__version__}\n' \
                 f'media: {url}\n'
     if tags:
         tags = tags.strip()
@@ -230,7 +230,7 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
 
 
 def create_pr(result, video, title, event_date, tags, category, speakers, loc, username, curr_time, video_title):
-    file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title)
+    file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title, username)
 
     absolute_path = os.path.abspath(file_name_with_ext)
     branch_name = loc.replace("/", "-")
