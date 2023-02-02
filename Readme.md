@@ -39,6 +39,8 @@ To check the version:
 
 `tstbtc {video_id} {directory}` create video transcript supplying the id of the YouTube video and the associated directory bitcointranscripts destination folder
 
+`tstbtc {audio_url} {directory} --title {title}` create audio transcript supplying the url of the audio, the source/year and the title of the audio
+
 To include optional metadata in your transcript, you can add the following parameters:
 - `-t` or `--title`: Supply transcribed file title in 'quotes'
 - `-d` or `--date`: Supply the event date in format 'yyyy-mm-dd'
@@ -47,9 +49,12 @@ To include optional metadata in your transcript, you can add the following param
 - `-c` or `--category`: Supply the category for the transcript in 'quotes' and separated by commas
 
 #### Examples
-To transcribe [this podcast episode](https://www.youtube.com/watch?v=Nq6WxJ0PgJ4) from Stephan Livera's podcast with the associated metadata, we would run either of the below commands. The first uses short argument tags, while the second uses long argument tags. The result is the same.:
+To transcribe [this podcast episode](https://www.youtube.com/watch?v=Nq6WxJ0PgJ4) from Stephan Livera's podcast with the associated metadata, we would run either of the below commands. The first uses short argument tags, while the second uses long argument tags. The result is the same.
 - `tstbtc Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast -t 'OP_Vault - A New Way to HODL?' -d '2023-01-30' -T 'op_vault' -s 'stephan livera, James O’Beirn'  -c ‘podcast’`
 - `tstbtc Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast --title 'OP_Vault - A New Way to HODL?' --date '2023-01-30' --tags 'op_vault' --speakers 'stephan livera, James O’Beirn'  --category ‘podcast’`
+
+To transcribe [this mp3 link](https://anchor.fm/s/7d083a4/podcast/play/64348045/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2023-1-1%2Ff7fafb12-9441-7d85-d557-e9e5d18ab788.mp3) from Stephan Livera's podcast with the associated metadata, we would run the below command.
+- `tstbtc https://anchor.fm/s/7d083a4/podcast/play/64348045/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2023-1-1%2Ff7fafb12-9441-7d85-d557-e9e5d18ab788.mp3 bitcointranscripts/stephan-livera-podcast --title 'SLP455 Anant Tapadia - Single Sig or Multi Sig?' --date '2023-02-01' --tags 'multisig' --speakers 'stephan livera, Anant Tapadia'  --category 'podcast'`
 
 
 ## OTHER REQUIREMENTS
