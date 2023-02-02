@@ -55,10 +55,15 @@ def add(
         except:
             print("Supplied date is invalid")
             return
+
+    created_files = []
     source_type = application.check_source_type(source)
     filename = application.process_source(source, title, event_date, tags, category, speakers, loc, model, username,
-                                          curr_time, source_type)
+                                          curr_time, source_type, created_files)
     if filename:
         """ INITIALIZE GIT AND OPEN A PR"""
         branch_name = loc.replace("/", "-")
         subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename[:-4]])
+        print("Transcription complete. Please check the PR for the transcription.")
+    print("Cleaning up...")
+    application.clean_up(created_files)
