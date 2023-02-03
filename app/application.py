@@ -196,7 +196,7 @@ def initialize():
     static_ffmpeg.add_paths()
 
 
-def write_to_file(result, url, title, date, tags, category, speakers, video_title, username):
+def write_to_file(result, url, title, date, tags, category, speakers, video_title, username, local):
     transcribed_text = result
     if title:
         file_title = title
@@ -204,8 +204,9 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
         file_title = video_title
     meta_data = '---\n' \
                 f'title: {file_title}\n' \
-                f'transcript_by: {username} via TBTBTC v{__version__}\n' \
-                f'media: {url}\n'
+                f'transcript_by: {username} via TBTBTC v{__version__}\n'
+    if not local:
+        meta_data += "f'media: {url}\n"
     if tags:
         tags = tags.strip()
         tags = tags.split(",")
@@ -241,10 +242,10 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
     return file_name_with_ext
 
 
-def get_md_file_path(result, video, title, event_date, tags, category, speakers, username,
+def get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local,
                      video_title):
     file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title,
-                                       username)
+                                       username, local)
 
     absolute_path = os.path.abspath(file_name_with_ext)
     return absolute_path
@@ -271,13 +272,18 @@ def get_username():
 
 def check_source_type(source):
     if source.endswith(".mp3") or source.endswith(".wav"):
-        return "audio"
+        if os.path.isfile(source):
+            return "audio-local"
+        else:
+            return "audio"
+    elif os.path.isfile(source):
+        return "video-local"
     elif check_if_video(source):
         return "video"
     elif check_if_playlist(source):
         return "playlist"
     else:
-        return 'video'
+        return None
 
 
 def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, local,
@@ -307,11 +313,10 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
     else:
         result = process_mp3(abs_path, model)
     absolute_path = get_md_file_path(result=result, video=source, title=title, event_date=event_date, tags=tags,
-                                     category=category, speakers=speakers, username=username,
+                                     category=category, speakers=speakers, username=username, local=local,
                                      video_title=filename[:-4])
     created_files.append(absolute_path)
-    if not local:
-        initialize_repo(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time)
+    initialize_repo(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time)
     return absolute_path
 
 
@@ -398,7 +403,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
             created_files.append(abs_path[:-4] + ".mp3")
         else:
             result = ""
-    absolute_path = get_md_file_path(result, video, title, event_date, tags, category, speakers, username,
+    absolute_path = get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local,
                                      filename[:-4])
     initialize_repo(absolute_path, loc, username, curr_time)
     created_files.append(filename[:-4] + '.description')
@@ -411,10 +416,19 @@ def process_source(source, title, event_date, tags, category, speakers, loc, mod
         filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                  speakers=speakers, loc=loc, model=model, username=username,
                                  curr_time=curr_time, local=local, created_files=created_files, test=test)
+    elif source_type == 'audio-local':
+        filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
+                                 speakers=speakers, loc=loc, model=model, username=username,
+                                 curr_time=curr_time, local=True, created_files=created_files, test=test)
     elif source_type == 'playlist':
         filename = process_videos(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                   speakers=speakers, loc=loc, model=model, username=username,
                                   curr_time=curr_time, created_files=created_files, chapters=chapters)
+    elif source_type == 'video-local':
+        filename = process_video(video=source, title=title, event_date=event_date,
+                                 tags=tags, category=category, speakers=speakers, loc=loc, model=model,
+                                 username=username, curr_time=curr_time, created_files=created_files, local=True,
+                                 chapters=chapters, test=test)
     else:
         filename = process_video(video=source, title=title, event_date=event_date,
                                  tags=tags, category=category, speakers=speakers, loc=loc, model=model,

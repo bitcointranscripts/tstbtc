@@ -54,7 +54,7 @@ def test_download_video_file():
     os.remove(video[:-3] + "description")
 
 
-@pytest.mark.main
+@pytest.mark.curr
 def test_chapter_creation():
     chapters = application.read_description("testAssets/test_video.description")
     with open("testAssets/test_video_1.chapters", "w") as file:
@@ -67,7 +67,7 @@ def test_chapter_creation():
     os.remove("testAssets/test_video_1.chapters")
 
 
-@pytest.mark.main
+@pytest.mark.curr
 def test_split_video():
     chapters = application.read_description("testAssets/test_video.description")
     application.split_mp4(chapters, "testAssets/test_video.mp4", "testAssets/test_video")
