@@ -34,6 +34,8 @@ def print_version(ctx, param, value):
                                                  "commas")
 @click.option('-v', '--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True, help="Show the application's version and exit.")
+@click.option('-C', '--chapters', is_flag=True, default=False,
+              help="Supply this flag if you want to generate chapters for the transcript")
 def add(
         source: str,
         loc: str,
@@ -43,6 +45,7 @@ def add(
         tags: str,
         speakers: str,
         category: str,
+        chapters: bool
 ) -> None:
     """Supply a YouTube video id and directory for transcription"""
     username = application.get_username()
@@ -57,9 +60,11 @@ def add(
             return
 
     created_files = []
-    source_type = application.check_source_type(source)
-    filename = application.process_source(source, title, event_date, tags, category, speakers, loc, model, username,
-                                          curr_time, source_type, created_files)
+    source_type = application.check_source_type(source=source)
+    filename = application.process_source(source=source, title=title, event_date=event_date, tags=tags,
+                                          category=category, speakers=speakers, loc=loc, model=model, username=username,
+                                          curr_time=curr_time, source_type=source_type, created_files=created_files,
+                                          chapters=chapters)
     if filename:
         """ INITIALIZE GIT AND OPEN A PR"""
         branch_name = loc.replace("/", "-")

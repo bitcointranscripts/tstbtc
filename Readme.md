@@ -77,6 +77,42 @@ To run the full test suite
 
 `pytest -v -s`
 
+## Testing
+
+To run the tests, run the below command:
+
+`cd test`
+
+To run the unit tests 
+
+`pytest -v -m main -s`
+
+To run the feature tests
+
+`pytest -v -m feature -s`
+
+To run the full test suite
+
+`pytest -v -s`
+
+## Testing
+
+To run the tests, run the below command:
+
+`cd test`
+
+To run the unit tests 
+
+`pytest -v -m main -s`
+
+To run the feature tests
+
+`pytest -v -m feature -s`
+
+To run the full test suite
+
+`pytest -v -s`
+
 ## OTHER REQUIREMENTS
 
 -  To enable us fork bitcointranscript repo and open a PR, we require you to login into your GitHub account. Kindly install `GITHUB CLI` using the instructions on their repo [here](https://github.com/cli/cli#installation). Following the prompt, please select the below options from the prompt to login:

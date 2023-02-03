@@ -13,7 +13,7 @@ import datetime
 from pytube.cli import on_progress
 
 
-def download_video(url):  # todo use absolute paths for all files
+def download_video(url):
     name = None
     try:
         print("URL: " + url)
@@ -225,7 +225,7 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
 
 
 def get_md_file_path(result, video, title, event_date, tags, category, speakers, username,
-                     video_title):  # todo rename function
+                     video_title):
     file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title,
                                        username)
 
@@ -278,8 +278,8 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
         return None
     # process audio file
     if not local:
-        filename = get_audio_file(source, title)
-        abs_path = os.path.abspath(filename)
+        filename = get_audio_file(url=source, title=title)
+        abs_path = os.path.abspath(path=filename)
         created_files.append(abs_path)
     else:
         filename = source.split("/")[-1]
@@ -289,21 +289,23 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
         print("File not found")
         return
     if filename.endswith('wav'):
-        abs_path = convert_wav_to_mp3(abs_path, filename)
+        abs_path = convert_wav_to_mp3(abs_path=abs_path, filename=filename)
         created_files.append(abs_path)
     if test:
         result = test
     else:
         result = process_mp3(abs_path, model)
-    absolute_path = get_md_file_path(result, source, title, event_date, tags, category, speakers, username,
-                                     filename[:-4])
+    absolute_path = get_md_file_path(result=result, video=source, title=title, event_date=event_date, tags=tags,
+                                     category=category, speakers=speakers, username=username,
+                                     video_title=filename[:-4])
     created_files.append(absolute_path)
     if not local:
-        initialize_repo(absolute_path, loc, username, curr_time)
+        initialize_repo(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time)
     return absolute_path
 
 
-def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, created_files):
+def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, created_files,
+                   chapters):
     print("Playlist detected")
     url = "https://www.youtube.com/playlist?list=" + source
     videos = get_playlist_videos(url)
@@ -315,19 +317,21 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
     filename = ""
 
     for video in videos:
-        filename = process_video(video, title, event_date, tags, category, speakers, loc, selected_model, username,
-                                 curr_time, created_files)
+        filename = process_video(video=video, title=title, event_date=event_date, tags=tags, category=category,
+                                 speakers=speakers, loc=loc, model=selected_model, username=username,
+                                 curr_time=curr_time, created_files=created_files, chapters=chapters, test=False)
         if filename is None:
             return None
     return filename
 
 
 def process_video(video, title, event_date, tags, category, speakers, loc, model, username, curr_time, created_files,
-                  local=False):
+                  chapters, test, local=False):
     result = ""
-    print("Transcribing video: " + video)
     if not local:
-        abs_path = download_video(video)
+        video = "https://www.youtube.com/watch?v=" + video
+        print("Transcribing video: " + video)
+        abs_path = download_video(url=video)
         if abs_path is None:
             print("File not found")
             return None
@@ -335,57 +339,67 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
         filename = abs_path.split("/")[-1]
     else:
         filename = video.split("/")[-1]
+        print("Transcribing video: " + filename)
         abs_path = video
     print()
     print()
 
-    chapters = read_description(abs_path[:-4] + '.description')
-    if len(chapters) > 0:
+    if chapters:
+        chapters = read_description(description_file=abs_path[:-4] + '.description')
+    if chapters and len(chapters) > 0:
         print("Chapters detected")
         write_chapters_file(abs_path[:-4] + '.chapters', chapters)
         created_files.append(abs_path[:-4] + '.chapters')
-        split_mp4(chapters, abs_path, filename[:-4])
+        split_mp4(chapters=chapters, download_filename=abs_path, download_name=abs_path[:-4])
         initialize()
         for current_index, chapter in enumerate(chapters):
-            print(f"Processing chapter {chapter[2]} {current_index + 1} of {len(chapters)}")  # todo add absolute paths
-            temp_filename = f'{filename[:-4]} - ({current_index}).mp4'
-            file = convert_video_to_mp3(temp_filename)
-            if file is None:
-                print("File not found")
-                return None
+            print(f"Processing chapter {chapter[2]} {current_index + 1} of {len(chapters)}")
+            temp_filename = f'{abs_path[:-4]} - ({current_index}).mp4'
+            if not test:
+                file = convert_video_to_mp3(filename=temp_filename)
+                if file is None:
+                    print("File not found")
+                    return None
+                temp_res = process_mp3(filename=temp_filename, model=model)
+                created_files.append(temp_filename[:-4] + ".mp3")
+            else:
+                temp_res = ""
             created_files.append(temp_filename)
-            temp_res = process_mp3(temp_filename, model)  # todo add absolute paths
-            created_files.append(temp_filename[:-4] + ".mp3")
             result = result + "## " + chapter[2] + "\n\n" + temp_res + "\n\n"
             print()
-        os.remove(filename)
-        created_files.append(filename)
+        if not local:
+            created_files.append(abs_path)
         created_files.append(filename[:-4] + '.chapters')
     else:
-        convert_video_to_mp3(filename)
-        created_files.append(filename)
-        result = process_mp3(filename, model)  # todo add absolute paths
-        created_files.append(filename[:-4] + ".mp3")
+        if not test:
+            convert_video_to_mp3(abs_path)
+            created_files.append(abs_path[:-4] + '.mp3')
+            result = process_mp3(abs_path[:-4] + '.mp3', model)
+            created_files.append(abs_path[:-4] + ".mp3")
+        else:
+            result = ""
     absolute_path = get_md_file_path(result, video, title, event_date, tags, category, speakers, username,
                                      filename[:-4])
     initialize_repo(absolute_path, loc, username, curr_time)
     created_files.append(filename[:-4] + '.description')
-    return filename
+    return absolute_path
 
 
 def process_source(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, source_type,
-                   created_files, local=False, test=None):
+                   created_files, chapters, local=False, test=None):
     if source_type == 'audio':
         filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                  speakers=speakers, loc=loc, model=model, username=username,
                                  curr_time=curr_time, local=local, created_files=created_files, test=test)
     elif source_type == 'playlist':
-        filename = process_videos(source, title, event_date, tags, category, speakers, loc, model, username,
-                                  curr_time, created_files)
+        filename = process_videos(source=source, title=title, event_date=event_date, tags=tags, category=category,
+                                  speakers=speakers, loc=loc, model=model, username=username,
+                                  curr_time=curr_time, created_files=created_files, chapters=chapters)
     else:
-        filename = process_video("https://www.youtube.com/watch?v=" + source, title, event_date, tags, category,
-                                 speakers, loc, model, username,
-                                 curr_time, created_files, local)
+        filename = process_video(video=source, title=title, event_date=event_date,
+                                 tags=tags, category=category, speakers=speakers, loc=loc, model=model,
+                                 username=username, curr_time=curr_time, created_files=created_files, local=local,
+                                 chapters=chapters, test=test)
     return filename
 
 

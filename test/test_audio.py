@@ -51,9 +51,7 @@ def test_audio_with_title():
     filename = application.process_source(source=source, title=title, event_date=None, tags=None, category=None,
                                           speakers=None, loc="yada/yada", model="tiny", username=username,
                                           curr_time=curr_time, source_type="audio", local=True,
-                                          created_files=created_files, test=result)
-    # print(created_files)
-    # print(filename)
+                                          created_files=created_files, test=result, chapters=False)
     assert os.path.isfile(filename)
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title)
     application.clean_up(created_files)
@@ -73,7 +71,7 @@ def test_audio_without_title():
     filename = application.process_source(source=source, title=title, event_date=None, tags=None, category=None,
                                           speakers=None, loc="yada/yada", model="tiny", username=username,
                                           curr_time=curr_time, source_type="audio", local=True,
-                                          created_files=created_files, test=result)
+                                          created_files=created_files, test=result, chapters=False)
     assert filename is None
     assert not check_md_file(path=filename, transcript_by=username, media=source, title=title)
     application.clean_up(created_files)
@@ -96,9 +94,7 @@ def test_audio_with_all_data():
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
                                           curr_time=curr_time, source_type="audio", local=True,
-                                          created_files=created_files, test=result)
-    # print(created_files)
-    # print(filename)
+                                          created_files=created_files, test=result, chapters=False)
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
