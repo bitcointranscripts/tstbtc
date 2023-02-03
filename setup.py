@@ -8,8 +8,8 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name='tstbtc',
     version='1.0.0',
-    author='Peter Tyonum',
-    author_email='withtvpeter@gmail.com',
+    author='Peter Tyonum , Shaswat Gupta',
+    author_email='withtvpeter@gmail.com, shaswat2001.sg@gmail.com',
     license='MIT',
     description='transcribes youtube videos/media to bitcointranscript',
     long_description=long_description,
