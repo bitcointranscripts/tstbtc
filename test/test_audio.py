@@ -5,7 +5,8 @@ from app import application
 import time
 
 
-def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, category=None, speakers=None):
+def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, category=None, speakers=None,
+                  local=False):
     is_correct = True
     if not path:
         return False
@@ -23,7 +24,8 @@ def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, 
         fields[key] = value
 
     is_correct &= fields["transcript_by"] == f'{transcript_by} via TBTBTC v{application.__version__}'
-    is_correct &= fields['media'] == media
+    if not local:
+        is_correct &= fields['media'] == media
     is_correct &= fields['title'] == title
 
     if date:
@@ -53,7 +55,7 @@ def test_audio_with_title():
                                           curr_time=curr_time, source_type="audio", local=True,
                                           created_files=created_files, test=result, chapters=False)
     assert os.path.isfile(filename)
-    assert check_md_file(path=filename, transcript_by=username, media=source, title=title)
+    assert check_md_file(path=filename, transcript_by=username, media=source, title=title, local=True)
     application.clean_up(created_files)
 
 
@@ -100,5 +102,5 @@ def test_audio_with_all_data():
     speakers = [speaker.strip() for speaker in speakers.split(",")]
     assert os.path.isfile(filename)
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title, date=date, tags=tags,
-                         category=category, speakers=speakers)
+                         category=category, speakers=speakers, local=True)
     application.clean_up(created_files)

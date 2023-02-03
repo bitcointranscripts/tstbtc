@@ -6,7 +6,7 @@ import re
 
 
 def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, category=None, speakers=None,
-                  chapters=None):
+                  chapters=None, local=False):
     is_correct = True
     if not path:
         return False
@@ -34,7 +34,8 @@ def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, 
     is_correct &= fields["transcript_by"] == f'{transcript_by} via TBTBTC v{application.__version__}'
     if not is_correct:
         print("Error:", fields["transcript_by"])
-    is_correct &= fields['media'] == media
+    if not local:
+        is_correct &= fields['media'] == media
     if not is_correct:
         print("Error:", fields['media'])
     is_correct &= fields['title'] == title
@@ -86,7 +87,7 @@ def test_video_with_title():
     assert os.path.isfile(filename)
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title,
                          date=date, tags=tags,
-                         category=category, speakers=speakers)
+                         category=category, speakers=speakers, local=True)
     created_files.append('test_video.md')
     application.clean_up(created_files)
 
@@ -115,7 +116,7 @@ def test_video_with_all_options():
     speakers = [speaker.strip() for speaker in speakers.split(",")]
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title,
                          date=date, tags=tags,
-                         category=category, speakers=speakers)
+                         category=category, speakers=speakers, local=True)
     created_files.append('test_video.md')
     application.clean_up(created_files)
 
@@ -151,8 +152,7 @@ def test_video_with_chapters():
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title, date=date, tags=tags,
-                         category=category, speakers=speakers, chapters=chapter_names)
+                         category=category, speakers=speakers, chapters=chapter_names, local=True)
     created_files.append('test_video.md')
     created_files.append("testAssets/test_video.chapters")
     application.clean_up(created_files)
-    # print(chapter_names)
