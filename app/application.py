@@ -12,6 +12,7 @@ import re
 import datetime
 from pytube.cli import on_progress
 from urllib.parse import urlparse, parse_qs
+import time
 
 
 def download_video(url):
@@ -133,7 +134,9 @@ def check_if_playlist(media):
                 or media.startswith("FL") \
                 or media.startswith("RD"):
             return True
-        pytube.Playlist(media)
+        playlists = list(pytube.Playlist(media).video_urls)
+        if type(playlists) is not list:
+            return False
         return True
     except:
         return False
@@ -308,20 +311,22 @@ def check_source_type(source):
             return "audio-local"
         else:
             return "audio"
+    elif check_if_playlist(source):
+        return "playlist"
     elif os.path.isfile(source):
         return "video-local"
     elif check_if_video(source):
         return "video"
-    elif check_if_playlist(source):
-        return "playlist"
     else:
         return None
 
 
-def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, local,
+def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, local,
                   created_files, test):
     try:
         print("audio file detected")
+        curr_time = str(round(time.time() * 1000))
+
         # check if title is supplied if not, return None
         if title is None:
             print("Error: Please supply a title for the audio file")
@@ -356,7 +361,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
         print(e)
 
 
-def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, created_files,
+def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, created_files,
                    chapters):
     try:
         print("Playlist detected")
@@ -376,7 +381,7 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
         for video in videos:
             filename = process_video(video=video, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=selected_model, username=username,
-                                     curr_time=curr_time, created_files=created_files, chapters=chapters, test=False)
+                                     created_files=created_files, chapters=chapters, test=False)
             if filename is None:
                 return None
         return filename
@@ -385,10 +390,11 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
         print(e)
 
 
-def process_video(video, title, event_date, tags, category, speakers, loc, model, username, curr_time, created_files,
+def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
                   chapters, test, local=False):
     try:
         result = ""
+        curr_time = str(round(time.time() * 1000))
         if not local:
             if "watch?v=" in video:
                 parsed_url = urlparse(video)
@@ -444,40 +450,43 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 created_files.append(abs_path[:-4] + ".mp3")
             else:
                 result = ""
-        absolute_path = get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local,
-                                         filename[:-4])
+        absolute_path = get_md_file_path(result=result, video=video, title=title, event_date=event_date, tags=tags,
+                                         category=category, speakers=speakers, username=username,
+                                         video_title=filename[:-4], local=local)
         initialize_repo(absolute_path, loc, username, curr_time)
         created_files.append(filename[:-4] + '.description')
+        branch_name = loc.replace("/", "-")
+        subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename])
         return absolute_path
     except Exception as e:
         print("Error processing video")
         print(e)
 
 
-def process_source(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, source_type,
+def process_source(source, title, event_date, tags, category, speakers, loc, model, username, source_type,
                    created_files, chapters, local=False, test=None):
     try:
         if source_type == 'audio':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=model, username=username,
-                                     curr_time=curr_time, local=local, created_files=created_files, test=test)
+                                     local=local, created_files=created_files, test=test)
         elif source_type == 'audio-local':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=model, username=username,
-                                     curr_time=curr_time, local=True, created_files=created_files, test=test)
+                                     local=True, created_files=created_files, test=test)
         elif source_type == 'playlist':
             filename = process_videos(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                       speakers=speakers, loc=loc, model=model, username=username,
-                                      curr_time=curr_time, created_files=created_files, chapters=chapters)
+                                      created_files=created_files, chapters=chapters)
         elif source_type == 'video-local':
             filename = process_video(video=source, title=title, event_date=event_date,
                                      tags=tags, category=category, speakers=speakers, loc=loc, model=model,
-                                     username=username, curr_time=curr_time, created_files=created_files, local=True,
+                                     username=username, created_files=created_files, local=True,
                                      chapters=chapters, test=test)
         else:
             filename = process_video(video=source, title=title, event_date=event_date,
                                      tags=tags, category=category, speakers=speakers, loc=loc, model=model,
-                                     username=username, curr_time=curr_time, created_files=created_files, local=local,
+                                     username=username, created_files=created_files, local=local,
                                      chapters=chapters, test=test)
         return filename
     except Exception as e:

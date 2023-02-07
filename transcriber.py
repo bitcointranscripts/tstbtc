@@ -62,7 +62,6 @@ def add(
     created_files = []
     try:
         username = application.get_username()
-        curr_time = str(round(time.time() * 1000))
         loc = loc.strip("/")
         event_date = None
         if date:
@@ -77,14 +76,11 @@ def add(
             print("Invalid source")
             return
         filename = application.process_source(source=source, title=title, event_date=event_date, tags=tags,
-                                              category=category, speakers=speakers, loc=loc, model=model,
-                                              username=username,
-                                              curr_time=curr_time, source_type=source_type, created_files=created_files,
+                                              category=category, speakers=speakers, loc=loc, model=model, username=username,
+                                              source_type=source_type, created_files=created_files,
                                               chapters=chapters)
         if filename:
             """ INITIALIZE GIT AND OPEN A PR"""
-            branch_name = loc.replace("/", "-")
-            subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename[:-4]])
             print("Transcription complete. Please check the PR for the transcription.")
         print("Cleaning up...")
         application.clean_up(created_files)
