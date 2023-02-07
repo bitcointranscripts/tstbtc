@@ -52,7 +52,7 @@ def test_audio_with_title():
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=None, tags=None, category=None,
                                           speakers=None, loc="yada/yada", model="tiny", username=username,
-                                          curr_time=curr_time, source_type="audio", local=True,
+                                          source_type="audio", local=True,
                                           created_files=created_files, test=result, chapters=False)
     assert os.path.isfile(filename)
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title, local=True)
@@ -72,7 +72,7 @@ def test_audio_without_title():
     title = None
     filename = application.process_source(source=source, title=title, event_date=None, tags=None, category=None,
                                           speakers=None, loc="yada/yada", model="tiny", username=username,
-                                          curr_time=curr_time, source_type="audio", local=True,
+                                          source_type="audio", local=True,
                                           created_files=created_files, test=result, chapters=False)
     assert filename is None
     assert not check_md_file(path=filename, transcript_by=username, media=source, title=title)
@@ -95,7 +95,7 @@ def test_audio_with_all_data():
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
-                                          curr_time=curr_time, source_type="audio", local=True,
+                                          source_type="audio", local=True,
                                           created_files=created_files, test=result, chapters=False)
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]

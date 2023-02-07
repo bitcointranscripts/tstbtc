@@ -82,7 +82,7 @@ def test_video_with_title():
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
-                                          curr_time=curr_time, source_type="video", local=True,
+                                          source_type="video", local=True,
                                           created_files=created_files, test=result, chapters=False)
     assert os.path.isfile(filename)
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title,
@@ -108,7 +108,7 @@ def test_video_with_all_options():
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
-                                          curr_time=curr_time, source_type="video", local=True,
+                                          source_type="video", local=True,
                                           created_files=created_files, test=True, chapters=False)
     assert os.path.isfile(filename)
     category = [cat.strip() for cat in category.split(",")]
@@ -137,7 +137,7 @@ def test_video_with_chapters():
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
-                                          curr_time=curr_time, source_type="video", local=True,
+                                          source_type="video", local=True,
                                           created_files=created_files, test=result, chapters=True)
     chapter_names = []
     with open("testAssets/test_video.chapters", "r") as file:
