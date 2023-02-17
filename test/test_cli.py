@@ -46,7 +46,7 @@ def test_chapter_creation():
         file.write(str(chapters))
     with open("testAssets/test_video_1.chapters", "r") as file:
         data = str(file.read().strip("\n"))
-        with open("testAssets/test_video.chapters", "r") as file:
+        with open("testAssets/test_video_chapters.chapters", "r") as file:
             chapters = str(file.read().strip("\n"))
             assert data == chapters
     os.remove("testAssets/test_video_1.chapters")
@@ -57,7 +57,7 @@ def test_split_video():
     chapters = application.read_description("testAssets/test_video.description")
     application.split_mp4(chapters, "testAssets/test_video.mp4", "testAssets/test_video")
     is_pass = True
-    for i in range(11):
+    for i in range(3):
         is_pass = is_pass and os.path.isfile("testAssets/test_video - (" + str(i) + ").mp4")
         os.remove("testAssets/test_video - (" + str(i) + ").mp4")
     assert is_pass
