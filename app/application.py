@@ -11,6 +11,7 @@ import requests
 import re
 import datetime
 from pytube.cli import on_progress
+from urllib.parse import urlparse, parse_qs
 
 
 def download_video(url):
@@ -115,10 +116,26 @@ def convert_wav_to_mp3(abs_path, filename):
 
 
 def check_if_playlist(media):
-    return media.startswith("PL") \
-        or media.startswith("UU") \
-        or media.startswith("FL") \
-        or media.startswith("RD")
+    try:
+        if media.startswith("PL") \
+                or media.startswith("UU") \
+                or media.startswith("FL") \
+                or media.startswith("RD"):
+            return True
+        pytube.Playlist(media)
+        return True
+    except:
+        return False
+
+
+def check_if_video(media):
+    if re.search(r'^([\dA-Za-z_-]{11})$', media):
+        return True
+    try:
+        pytube.YouTube(media)
+        return True
+    except:
+        return False
 
 
 def get_playlist_videos(url):
@@ -253,20 +270,14 @@ def get_username():
 
 
 def check_source_type(source):
-    if source.startswith("https://www.youtube.com"):
-        if source.find("list=") != -1:
-            return "playlist"
-        else:
-            return "video"
-    elif source.endswith(".mp3") or source.endswith(".wav"):
+    if source.endswith(".mp3") or source.endswith(".wav"):
         return "audio"
-    elif source.startswith("PL") \
-            or source.startswith("UU") \
-            or source.startswith("FL") \
-            or source.startswith("RD"):
+    elif check_if_video(source):
+        return "video"
+    elif check_if_playlist(source):
         return "playlist"
     else:
-        return "video"
+        return 'video'
 
 
 def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, local,
@@ -307,7 +318,11 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
 def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, curr_time, created_files,
                    chapters):
     print("Playlist detected")
+    if source.startswith("http") or source.startswith("www"):
+        parsed_url = urlparse(source)
+        source = parse_qs(parsed_url.query)["list"][0]
     url = "https://www.youtube.com/playlist?list=" + source
+    print(url)
     videos = get_playlist_videos(url)
     if videos is None:
         print("Playlist is empty")
@@ -329,6 +344,11 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                   chapters, test, local=False):
     result = ""
     if not local:
+        if "watch?v=" in video:
+            parsed_url = urlparse(video)
+            video = parse_qs(parsed_url.query)["v"][0]
+        elif "youtu.be" in video or "embed" in video:
+            video = video.split("/")[-1]
         video = "https://www.youtube.com/watch?v=" + video
         print("Transcribing video: " + video)
         abs_path = download_video(url=video)

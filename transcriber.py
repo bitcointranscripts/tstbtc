@@ -1,4 +1,3 @@
-import os
 import subprocess
 import click
 from app import application
@@ -47,7 +46,9 @@ def add(
         category: str,
         chapters: bool
 ) -> None:
-    """Supply a YouTube video id and directory for transcription"""
+    """Supply a YouTube video id and directory for transcription. \n
+       Note: The https links need to be wrapped in quotes when running the command on zsh
+    """
     username = application.get_username()
     curr_time = str(round(time.time() * 1000))
     loc = loc.strip("/")

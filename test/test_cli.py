@@ -12,16 +12,31 @@ def test_initialize_repo():
         assert False
 
 
-@pytest.mark.main
+@pytest.mark.feature
 def test_find_source_type():
     video = application.check_source_type("B0HW_sJ503Y") == "video"
+    video1 = application.check_source_type("https://www.youtube.com/watch?v=B0HW_sJ503Y") == "video"
+    video2 = application.check_source_type("https://youtu.be/B0HW_sJ503Y") == "video"
+    video3 = application.check_source_type("https://www.youtube.com/watch?v=B0HW_sJ503Y&list"
+                                           "=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "video"
+    video4 = application.check_source_type("https://youtube.com/embed/B0HW_sJ503Y") == "video"
+    video5 = application.check_source_type("youtube.com/watch?v=B0HW_sJ503Y") == "video"
+    video6 = application.check_source_type("www.youtube.com/watch?v=B0HW_sJ503Y&list") == "video"
+    video7 = application.check_source_type("https://youtube.com/watch?v=B0HW_sJ503Y") == "video"
 
     playlist = application.check_source_type("PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
+    playlist1 = application.check_source_type(
+        "https://www.youtube.com/playlist?list=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
+    playlist2 = application.check_source_type(
+        "www.youtube.com/playlist?list=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
+    playlist3 = application.check_source_type(
+        "https://youtube.com/playlist?list=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
 
     audio = application.check_source_type(
         "https://anchor.fm/s/12fe0620/podcast/play/32260353/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging"
         "%2F2021-3-26%2Fdc6f12e7-a547-d872-6ef6-7acfe755a692.mp3") == "audio"
-    assert audio and playlist and video
+    assert audio and playlist and video and video1 and video2 and video3 and video4 and video5 and video6 and video7 \
+           and playlist1 and playlist2 and playlist3
 
 
 def test_download_audio_file():

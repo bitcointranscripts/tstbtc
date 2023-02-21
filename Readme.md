@@ -39,6 +39,8 @@ To check the version:
 
 `tstbtc {video_id} {directory}` create video transcript supplying the id of the YouTube video and the associated directory bitcointranscripts destination folder
 
+Note: The https links need to be wrapped in quotes when running the command on zsh
+
 `tstbtc {audio_url} {directory} --title {title}` create audio transcript supplying the url of the audio, the source/year and the title of the audio
 
 To include optional metadata in your transcript, you can add the following parameters:
