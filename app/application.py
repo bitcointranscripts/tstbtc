@@ -397,6 +397,8 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 video = video.split("/")[-1]
             video = "https://www.youtube.com/watch?v=" + video
             print("Transcribing video: " + video)
+            if event_date is None:
+                event_date = get_date(video)
             abs_path = download_video(url=video)
             if abs_path is None:
                 print("File not found")
@@ -483,6 +485,11 @@ def process_source(source, title, event_date, tags, category, speakers, loc, mod
     except Exception as e:
         print("Error processing source")
         print(e)
+
+
+def get_date(url):
+    video = pytube.YouTube(url)
+    return str(video.publish_date).split(" ")[0]
 
 
 def clean_up(created_files):
