@@ -288,10 +288,10 @@ def get_md_file_path(result, video, title, event_date, tags, category, speakers,
         print(e)
 
 
-def create_pr(absolute_path, loc, username, curr_time, filename):
+def create_pr(absolute_path, loc, username, curr_time, title):
     branch_name = loc.replace("/", "-")
     subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name, username, curr_time])
-    subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename])
+    subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, title])
     print("Please check the PR for the transcription.")
 
 
@@ -364,7 +364,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
 
         created_files.append(absolute_path)
         if pr:
-            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, filename=filename)
+            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, title=title)
         else:
             created_files.append(absolute_path)
         return absolute_path
@@ -464,12 +464,14 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 created_files.append(abs_path[:-4] + ".mp3")
             else:
                 result = ""
+        if not title:
+            title = filename[:-4]
         absolute_path = get_md_file_path(result=result, video=video, title=title, event_date=event_date, tags=tags,
                                          category=category, speakers=speakers, username=username,
                                          video_title=filename[:-4], local=local, pr=pr, test=test)
         created_files.append(filename[:-4] + '.description')
         if pr:
-            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, filename=filename)
+            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, title=title)
         else:
             created_files.append(absolute_path)
         return absolute_path
