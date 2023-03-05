@@ -1,8 +1,9 @@
 from app import application
-import time
 import os
 import pytest
 import re
+from datetime import datetime
+import json
 
 
 def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, category=None, speakers=None,
@@ -78,7 +79,6 @@ def test_video_with_title():
     tags = None
     category = None
     date = None
-    curr_time = str(round(time.time() * 1000))
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
@@ -103,8 +103,8 @@ def test_video_with_all_options():
     speakers = "speaker1,speaker2"
     tags = "tag1, tag2"
     category = "category"
-    date = "2020-01-01"
-    curr_time = str(round(time.time() * 1000))
+    date = "2020-01-31"
+    date = datetime.strptime(date, '%Y-%m-%d').date()
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
@@ -114,8 +114,9 @@ def test_video_with_all_options():
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
-    assert check_md_file(path=filename, transcript_by=username, media=source, title=title,
-                         date=date, tags=tags,
+    date = date.strftime('%Y-%m-%d')
+
+    assert check_md_file(path=filename, transcript_by=username, media=source, title=title, date=date, tags=tags,
                          category=category, speakers=speakers, local=True)
     created_files.append('test_video.md')
     application.clean_up(created_files)
@@ -132,8 +133,8 @@ def test_video_with_chapters():
     speakers = "speaker1,speaker2"
     tags = "tag1, tag2"
     category = "category"
-    date = "2020-01-01"
-    curr_time = str(round(time.time() * 1000))
+    date = "2020-01-31"
+    date = datetime.strptime(date, '%Y-%m-%d').date()
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
@@ -151,8 +152,27 @@ def test_video_with_chapters():
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
+    date = date.strftime('%Y-%m-%d')
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title, date=date, tags=tags,
                          category=category, speakers=speakers, chapters=chapter_names, local=True)
     created_files.append('test_video.md')
     created_files.append("testAssets/test_video.chapters")
     application.clean_up(created_files)
+
+
+@pytest.mark.feature
+def test_generate_payload():
+    date = "2020-01-31"
+    date = datetime.strptime(date, '%Y-%m-%d').date()
+    with open("testAssets/transcript.txt", "r") as file:
+        transcript = file.read()
+        file.close()
+    payload = application.generate_payload(title="test_title", event_date=date, tags="tag1, tag2", test=True,
+                                           category="category1, category2", speakers="speaker1, speaker2",
+                                           username="username", media="testAssets/test_video.mp4",
+                                           transcript=transcript)
+    with open('testAssets/payload.json', 'r') as outfile:
+        content = json.load(outfile)
+        outfile.close()
+    assert payload == content
+
