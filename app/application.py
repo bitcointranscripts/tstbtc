@@ -1,4 +1,5 @@
 """This module provides the transcript cli."""
+import json
 import subprocess
 from clint.textui import progress
 import pytube
@@ -13,6 +14,7 @@ import datetime
 from pytube.cli import on_progress
 from urllib.parse import urlparse, parse_qs
 import time
+from dotenv import dotenv_values
 
 
 def download_video(url):
@@ -219,7 +221,7 @@ def initialize():
         print(e)
 
 
-def write_to_file(result, url, title, date, tags, category, speakers, video_title, username, local):
+def write_to_file(result, url, title, date, tags, category, speakers, video_title, username, local, test, pr):
     try:
         transcribed_text = result
         if title:
@@ -250,7 +252,6 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
                 category[i] = category[i].strip()
             meta_data += f'categories: {category}\n'
 
-        print(video_title)
         file_name = video_title.replace(' ', '-')
         file_name_with_ext = file_name + '.md'
 
@@ -258,22 +259,27 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
             meta_data = meta_data + f'date: {date}\n\n'
 
         meta_data += '---\n'
-
-        with open(file_name_with_ext, 'a') as opf:
-            opf.write(meta_data + '\n')
-            opf.write(transcribed_text + '\n')
-            opf.close()
+        if test is not None or pr:
+            with open(file_name_with_ext, 'a') as opf:
+                opf.write(meta_data + '\n')
+                opf.write(transcribed_text + '\n')
+                opf.close()
+        if local:
+            url = None
+        if not pr:
+            generate_payload(title=file_title, transcript=transcribed_text, media=url, tags=tags,
+                             category=category, speakers=speakers, username=username, event_date=date, test=test)
         return file_name_with_ext
     except Exception as e:
         print("Error writing to file")
         print(e)
 
 
-def get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local,
-                     video_title):
+def get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local, video_title, test,
+                     pr):
     try:
         file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title,
-                                           username, local)
+                                           username, local, test, pr)
 
         absolute_path = os.path.abspath(file_name_with_ext)
         return absolute_path
@@ -282,9 +288,11 @@ def get_md_file_path(result, video, title, event_date, tags, category, speakers,
         print(e)
 
 
-def initialize_repo(absolute_path, loc, username, curr_time):
+def create_pr(absolute_path, loc, username, curr_time, filename):
     branch_name = loc.replace("/", "-")
     subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name, username, curr_time])
+    subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename])
+    print("Please check the PR for the transcription.")
 
 
 def get_username():
@@ -322,7 +330,7 @@ def check_source_type(source):
 
 
 def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, local,
-                  created_files, test):
+                  created_files, test, pr):
     try:
         print("audio file detected")
         curr_time = str(round(time.time() * 1000))
@@ -352,9 +360,13 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
             result = process_mp3(abs_path, model)
         absolute_path = get_md_file_path(result=result, video=source, title=title, event_date=event_date, tags=tags,
                                          category=category, speakers=speakers, username=username, local=local,
-                                         video_title=filename[:-4])
+                                         video_title=filename[:-4], test=test, pr=pr)
+
         created_files.append(absolute_path)
-        initialize_repo(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time)
+        if pr:
+            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, filename=filename)
+        else:
+            created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
         print("Error processing audio file")
@@ -362,7 +374,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
 
 
 def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, created_files,
-                   chapters):
+                   chapters, pr):
     try:
         print("Playlist detected")
         if source.startswith("http") or source.startswith("www"):
@@ -381,7 +393,7 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
         for video in videos:
             filename = process_video(video=video, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=selected_model, username=username,
-                                     created_files=created_files, chapters=chapters, test=False)
+                                     pr=pr, created_files=created_files, chapters=chapters, test=False)
             if filename is None:
                 return None
         return filename
@@ -391,7 +403,7 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
 
 
 def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
-                  chapters, test, local=False):
+                  chapters, test, pr, local=False):
     try:
         result = ""
         curr_time = str(round(time.time() * 1000))
@@ -452,11 +464,12 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 result = ""
         absolute_path = get_md_file_path(result=result, video=video, title=title, event_date=event_date, tags=tags,
                                          category=category, speakers=speakers, username=username,
-                                         video_title=filename[:-4], local=local)
-        initialize_repo(absolute_path, loc, username, curr_time)
+                                         video_title=filename[:-4], local=local, pr=pr, test=test)
         created_files.append(filename[:-4] + '.description')
-        branch_name = loc.replace("/", "-")
-        subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, filename])
+        if pr:
+            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, filename=filename)
+        else:
+            created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
         print("Error processing video")
@@ -464,30 +477,30 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
 
 
 def process_source(source, title, event_date, tags, category, speakers, loc, model, username, source_type,
-                   created_files, chapters, local=False, test=None):
+                   created_files, chapters, local=False, test=None, pr=False):
     try:
         if source_type == 'audio':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=model, username=username,
-                                     local=local, created_files=created_files, test=test)
+                                     local=local, created_files=created_files, test=test, pr=pr)
         elif source_type == 'audio-local':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=model, username=username,
-                                     local=True, created_files=created_files, test=test)
+                                     local=True, created_files=created_files, test=test, pr=pr)
         elif source_type == 'playlist':
             filename = process_videos(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                       speakers=speakers, loc=loc, model=model, username=username,
-                                      created_files=created_files, chapters=chapters)
+                                      created_files=created_files, chapters=chapters, pr=pr)
         elif source_type == 'video-local':
             filename = process_video(video=source, title=title, event_date=event_date,
                                      tags=tags, category=category, speakers=speakers, loc=loc, model=model,
                                      username=username, created_files=created_files, local=True,
-                                     chapters=chapters, test=test)
+                                     chapters=chapters, test=test, pr=pr)
         else:
             filename = process_video(video=source, title=title, event_date=event_date,
                                      tags=tags, category=category, speakers=speakers, loc=loc, model=model,
                                      username=username, created_files=created_files, local=local,
-                                     chapters=chapters, test=test)
+                                     chapters=chapters, test=test, pr=pr)
         return filename
     except Exception as e:
         print("Error processing source")
@@ -498,3 +511,27 @@ def clean_up(created_files):
     for file in created_files:
         if os.path.isfile(file):
             os.remove(file)
+
+
+def generate_payload(title, event_date, tags, category, speakers, username, media, transcript, test):
+    event_date = event_date if event_date is None else event_date.strftime('%Y-%m-%d')
+    data = {
+        "title": title,
+        "transcript_by": f'{username} via TBTBTC v{__version__}\n',
+        "categories": str(category),
+        "tags": str(tags),
+        "speakers": str(speakers),
+        "date": event_date,
+        "media": media,
+        "body": transcript
+    }
+    content = {'content': data}
+    if test:
+        return content
+    else:
+        config = dotenv_values(".env")
+        url = config['QUEUE_ENDPOINT'] + "/api/transcripts"
+        resp = requests.post(url, json=content)
+        if resp.status_code == 200:
+            print("Transcript added to queue")
+        return resp

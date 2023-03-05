@@ -45,6 +45,7 @@ def print_help(ctx, param, value):
               help="Supply this flag if you want to generate chapters for the transcript")
 @click.option('-h', '--help', is_flag=True, callback=print_help, expose_value=False, is_eager=True,
               help="Show the application's help and exit.")
+@click.option('-p', '--PR', is_flag=True, default=False, help="Supply this flag if you want to generate a payload")
 def add(
         source: str,
         loc: str,
@@ -54,11 +55,13 @@ def add(
         tags: str,
         speakers: str,
         category: str,
-        chapters: bool
+        chapters: bool,
+        pr: bool
 ) -> None:
     """Supply a YouTube video id and directory for transcription. \n
        Note: The https links need to be wrapped in quotes when running the command on zsh
     """
+    print(pr)
     created_files = []
     try:
         username = application.get_username()
@@ -76,12 +79,12 @@ def add(
             print("Invalid source")
             return
         filename = application.process_source(source=source, title=title, event_date=event_date, tags=tags,
-                                              category=category, speakers=speakers, loc=loc, model=model, username=username,
-                                              source_type=source_type, created_files=created_files,
-                                              chapters=chapters)
+                                              category=category, speakers=speakers, loc=loc, model=model,
+                                              username=username, chapters=chapters, pr=pr,
+                                              source_type=source_type, created_files=created_files)
         if filename:
             """ INITIALIZE GIT AND OPEN A PR"""
-            print("Transcription complete. Please check the PR for the transcription.")
+            print("Transcription complete")
         print("Cleaning up...")
         application.clean_up(created_files)
     except Exception as e:
