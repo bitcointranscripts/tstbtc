@@ -39,9 +39,12 @@ def test_find_source_type():
 
 
 def test_download_audio_file():
+    if not os.path.isdir("tmp"):
+        os.mkdir("tmp")
     audio = application.get_audio_file("https://dcs.megaphone.fm/FPMN6776580946.mp3", "test")
-    assert os.path.isfile(audio)
-    os.remove(audio)
+    print("audio", audio)
+    assert os.path.isfile("tmp/" + audio)
+    os.remove("tmp/"+audio)
 
 
 def test_download_video_file():
