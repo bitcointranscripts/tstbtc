@@ -61,7 +61,6 @@ def add(
     """Supply a YouTube video id and directory for transcription. \n
        Note: The https links need to be wrapped in quotes when running the command on zsh
     """
-    print(pr)
     created_files = []
     try:
         username = application.get_username()

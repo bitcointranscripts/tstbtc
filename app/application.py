@@ -535,24 +535,28 @@ def clean_up(created_files):
 
 
 def generate_payload(title, event_date, tags, category, speakers, username, media, transcript, test):
-    event_date = event_date if event_date is None else event_date.strftime('%Y-%m-%d')
-    data = {
-        "title": title,
-        "transcript_by": f'{username} via TBTBTC v{__version__}\n',
-        "categories": str(category),
-        "tags": str(tags),
-        "speakers": str(speakers),
-        "date": event_date,
-        "media": media,
-        "body": transcript
-    }
-    content = {'content': data}
-    if test:
-        return content
-    else:
-        config = dotenv_values(".env")
-        url = config['QUEUE_ENDPOINT'] + "/api/transcripts"
-        resp = requests.post(url, json=content)
-        if resp.status_code == 200:
-            print("Transcript added to queue")
-        return resp
+    try:
+        event_date = event_date if event_date is None else event_date if type(
+            event_date) is str else event_date.strftime('%Y-%m-%d')
+        data = {
+            "title": title,
+            "transcript_by": f'{username} via TBTBTC v{__version__}\n',
+            "categories": str(category),
+            "tags": str(tags),
+            "speakers": str(speakers),
+            "date": event_date,
+            "media": media,
+            "body": transcript
+        }
+        content = {'content': data}
+        if test:
+            return content
+        else:
+            config = dotenv_values(".env")
+            url = config['QUEUE_ENDPOINT'] + "/api/transcripts"
+            resp = requests.post(url, json=content)
+            if resp.status_code == 200:
+                print("Transcript added to queue")
+            return resp
+    except Exception as e:
+        print(e)
