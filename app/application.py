@@ -26,17 +26,20 @@ def download_video(url):
         name = video.title.replace("/", "-")
         print("Video title: " + name)
 
-        with open(name + '.description', 'w') as f:
+        with open("tmp/" + name + '.description', 'w') as f:
             f.write(video.description)
             f.close()
         stream = video.streams.get_by_itag(18)
-        stream.download()
-        os.rename(stream.default_filename, name + '.mp4')
-        return os.path.abspath(name + '.mp4')
+        stream.download("tmp")
+        os.rename("tmp/" + stream.default_filename, "tmp/" + name + '.mp4')
+
+        return os.path.abspath("tmp/" + name + '.mp4')
     except Exception as e:
         print("Error downloading video")
-        if name and os.path.exists(name + '.description'):
-            os.remove(name + '.description')
+        if name and os.path.exists("tmp/" + name + '.description'):
+            os.remove("tmp/" + name + '.description')
+        if name and os.path.exists("tmp/" + name + ".mp4"):
+            os.remove("tmp/" + name + '.mp4')
         print(e)
         return
 
@@ -180,7 +183,7 @@ def get_audio_file(url, title):
     print("downloading audio file")
     try:
         audio = requests.get(url, stream=True)
-        with open(title + ".mp3", "wb") as f:
+        with open("tmp/" + title + ".mp3", "wb") as f:
             total_length = int(audio.headers.get('content-length'))
             for chunk in progress.bar(audio.iter_content(chunk_size=1024), expected_size=(total_length / 1024) + 1):
                 if chunk:
@@ -253,12 +256,13 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
             meta_data += f'categories: {category}\n'
 
         file_name = video_title.replace(' ', '-')
-        file_name_with_ext = file_name + '.md'
+        file_name_with_ext = "tmp/" + file_name + '.md'
 
         if date:
             meta_data = meta_data + f'date: {date}\n\n'
 
         meta_data += '---\n'
+        print("writing .md file1")
         if test is not None or pr:
             with open(file_name_with_ext, 'a') as opf:
                 opf.write(meta_data + '\n')
@@ -266,9 +270,12 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
                 opf.close()
         if local:
             url = None
+        print("writing .md file2")
         if not pr:
+            print("writing .md file3")
             generate_payload(title=file_title, transcript=transcribed_text, media=url, tags=tags,
                              category=category, speakers=speakers, username=username, event_date=date, test=test)
+        print("writing .md file")
         return file_name_with_ext
     except Exception as e:
         print("Error writing to file")
@@ -278,8 +285,10 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
 def get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local, video_title, test,
                      pr):
     try:
+        print("writing .md file")
         file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title,
                                            username, local, test, pr)
+        print("wrote .md file")
 
         absolute_path = os.path.abspath(file_name_with_ext)
         return absolute_path
@@ -455,7 +464,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 print()
             if not local:
                 created_files.append(abs_path)
-            created_files.append(filename[:-4] + '.chapters')
+            created_files.append("tmp/" + filename[:-4] + '.chapters')
         else:
             if not test:
                 convert_video_to_mp3(abs_path)
@@ -467,7 +476,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
         absolute_path = get_md_file_path(result=result, video=video, title=title, event_date=event_date, tags=tags,
                                          category=category, speakers=speakers, username=username,
                                          video_title=filename[:-4], local=local, pr=pr, test=test)
-        created_files.append(filename[:-4] + '.description')
+        created_files.append("tmp/" + filename[:-4] + '.description')
         if pr:
             create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, filename=filename)
         else:
@@ -481,6 +490,8 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
 def process_source(source, title, event_date, tags, category, speakers, loc, model, username, source_type,
                    created_files, chapters, local=False, test=None, pr=False):
     try:
+        if not os.path.isdir("tmp"):
+            os.mkdir("tmp")
         if source_type == 'audio':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=model, username=username,
@@ -518,6 +529,7 @@ def clean_up(created_files):
     for file in created_files:
         if os.path.isfile(file):
             os.remove(file)
+    os.rmdir("tmp")
 
 
 def generate_payload(title, event_date, tags, category, speakers, username, media, transcript, test):
