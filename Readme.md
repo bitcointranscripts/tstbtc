@@ -82,10 +82,6 @@ To run the full test suite
 
 ## Testing
 
-To run the tests, run the below command:
-
-`cd test`
-
 To run the unit tests 
 
 `pytest -v -m main -s`
