@@ -69,10 +69,10 @@ def check_md_file(path, transcript_by, media, title=None, date=None, tags=None, 
 
 @pytest.mark.feature
 def test_video_with_title():
-    with open("testAssets/transcript.txt", "r") as file:
+    with open("test/testAssets/transcript.txt", "r") as file:
         result = file.read()
         file.close()
-    source = 'testAssets/test_video.mp4'
+    source = 'test/testAssets/test_video.mp4'
     username = "username"
     title = "test_video"
     speakers = None
@@ -94,10 +94,10 @@ def test_video_with_title():
 
 @pytest.mark.feature
 def test_video_with_all_options():
-    with open("testAssets/transcript.txt", "r") as file:
+    with open("test/testAssets/transcript.txt", "r") as file:
         result = file.read()
         file.close()
-    source = 'testAssets/test_video.mp4'
+    source = 'test/testAssets/test_video.mp4'
     username = "username"
     title = "test_video"
     speakers = "speaker1,speaker2"
@@ -124,10 +124,10 @@ def test_video_with_all_options():
 
 @pytest.mark.feature
 def test_video_with_chapters():
-    with open("testAssets/transcript.txt", "r") as file:
+    with open("test/testAssets/transcript.txt", "r") as file:
         result = file.read()
         file.close()
-    source = 'testAssets/test_video.mp4'
+    source = 'test/testAssets/test_video.mp4'
     username = "username"
     title = "test_video"
     speakers = "speaker1,speaker2"
@@ -141,7 +141,7 @@ def test_video_with_chapters():
                                           source_type="video", local=True,
                                           created_files=created_files, test=result, chapters=True)
     chapter_names = []
-    with open("testAssets/test_video.chapters", "r") as file:
+    with open("test/testAssets/test_video.chapters", "r") as file:
         result = file.read()
         for x in result.split('\n'):
             if re.search("CHAPTER\d\dNAME", x):
@@ -156,7 +156,7 @@ def test_video_with_chapters():
     assert check_md_file(path=filename, transcript_by=username, media=source, title=title, date=date, tags=tags,
                          category=category, speakers=speakers, chapters=chapter_names, local=True)
     created_files.append('test_video.md')
-    created_files.append("testAssets/test_video.chapters")
+    created_files.append("test/testAssets/test_video.chapters")
     application.clean_up(created_files)
 
 
@@ -164,14 +164,14 @@ def test_video_with_chapters():
 def test_generate_payload():
     date = "2020-01-31"
     date = datetime.strptime(date, '%Y-%m-%d').date()
-    with open("testAssets/transcript.txt", "r") as file:
+    with open("test/testAssets/transcript.txt", "r") as file:
         transcript = file.read()
         file.close()
     payload = application.generate_payload(title="test_title", event_date=date, tags="tag1, tag2", test=True,
                                            category="category1, category2", speakers="speaker1, speaker2",
-                                           username="username", media="testAssets/test_video.mp4",
+                                           username="username", media="test/testAssets/test_video.mp4",
                                            transcript=transcript)
-    with open('testAssets/payload.json', 'r') as outfile:
+    with open('test/testAssets/payload.json', 'r') as outfile:
         content = json.load(outfile)
         outfile.close()
     assert payload == content

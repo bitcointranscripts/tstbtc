@@ -55,30 +55,30 @@ def test_download_video_file():
 
 @pytest.mark.main
 def test_chapter_creation():
-    chapters = application.read_description("testAssets/test_video.description")
-    with open("testAssets/test_video_1.chapters", "w") as file:
+    chapters = application.read_description("test/testAssets/test_video.description")
+    with open("test/testAssets/test_video_1.chapters", "w") as file:
         file.write(str(chapters))
-    with open("testAssets/test_video_1.chapters", "r") as file:
+    with open("test/testAssets/test_video_1.chapters", "r") as file:
         data = str(file.read().strip("\n"))
-        with open("testAssets/test_video_chapters.chapters", "r") as file:
+        with open("test/testAssets/test_video_chapters.chapters", "r") as file:
             chapters = str(file.read().strip("\n"))
             assert data == chapters
-    os.remove("testAssets/test_video_1.chapters")
+    os.remove("test/testAssets/test_video_1.chapters")
 
 
 @pytest.mark.main
 def test_split_video():
-    chapters = application.read_description("testAssets/test_video.description")
-    application.split_mp4(chapters, "testAssets/test_video.mp4", "testAssets/test_video")
+    chapters = application.read_description("test/testAssets/test_video.description")
+    application.split_mp4(chapters, "test/testAssets/test_video.mp4", "test/testAssets/test_video")
     is_pass = True
     for i in range(3):
-        is_pass = is_pass and os.path.isfile("testAssets/test_video - (" + str(i) + ").mp4")
-        os.remove("testAssets/test_video - (" + str(i) + ").mp4")
+        is_pass = is_pass and os.path.isfile("test/testAssets/test_video - (" + str(i) + ").mp4")
+        os.remove("test/testAssets/test_video - (" + str(i) + ").mp4")
     assert is_pass
 
 
 @pytest.mark.main
 def test_convert_video_to_audio():
-    application.convert_video_to_mp3("testAssets/test_video.mp4")
-    assert os.path.isfile("testAssets/test_video.mp3")
-    os.remove("testAssets/test_video.mp3")
+    application.convert_video_to_mp3("test/testAssets/test_video.mp4")
+    assert os.path.isfile("test/testAssets/test_video.mp3")
+    os.remove("test/testAssets/test_video.mp3")

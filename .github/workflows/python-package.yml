@@ -30,5 +30,4 @@ jobs:
           pip3 install --use-pep517 --editable .
       - name: Test the application
         run: |
-          cd test
-          pytest -v
+          pytest -v -s .
