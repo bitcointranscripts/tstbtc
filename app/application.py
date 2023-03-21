@@ -1,5 +1,6 @@
 """This module provides the transcript cli."""
 import json
+import shutil
 import subprocess
 from clint.textui import progress
 import pytube
@@ -10,65 +11,63 @@ import static_ffmpeg
 from app import __version__
 import requests
 import re
-import datetime
-from pytube.cli import on_progress
 from urllib.parse import urlparse, parse_qs
 import time
 from dotenv import dotenv_values
+import yt_dlp
 
 
 def download_video(url):
-    name = None
     try:
         print("URL: " + url)
         print("Downloading video... Please wait.")
-        video = pytube.YouTube(url, on_progress_callback=on_progress)
-        name = video.title.replace("/", "-")
-        print("Video title: " + name)
 
-        with open("tmp/" + name + '.description', 'w') as f:
-            f.write(video.description)
-            f.close()
-        stream = video.streams.get_by_itag(18)
-        stream.download("tmp")
-        os.rename("tmp/" + stream.default_filename, "tmp/" + name + '.mp4')
+        ydl_opts = {
+            'format': '18',
+            'outtmpl': 'tmp/videoFile.%(ext)s',
+            'nopart': True,
+            'writeinfojson': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ytdl:
+            ytdl.download([url])
+
+        with open('tmp/videoFile.info.json') as file:
+            info = ytdl.sanitize_info(json.load(file))
+            name = info['title'].replace('/', '-')
+            file.close()
+
+        os.rename("tmp/videoFile.mp4", "tmp/" + name + '.mp4')
 
         return os.path.abspath("tmp/" + name + '.mp4')
     except Exception as e:
         print("Error downloading video")
-        if name and os.path.exists("tmp/" + name + '.description'):
-            os.remove("tmp/" + name + '.description')
-        if name and os.path.exists("tmp/" + name + ".mp4"):
-            os.remove("tmp/" + name + '.mp4')
-        print(e)
+        shutil.rmtree('tmp')
         return
 
 
-def read_description(description_file):
-    list_of_chapters = []
-    print("Reading description file: " + description_file)
-    if not os.path.exists(description_file):
-        print("Description file not found")
+def read_description(prefix):
+    try:
+        list_of_chapters = []
+        with open(prefix + 'videoFile.info.json', 'r') as f:
+            info = json.load(f)
+        if 'chapters' not in info:
+            print("No chapters found in description")
+            return list_of_chapters
+        for index, x in enumerate(info['chapters']):
+            name = x['title']
+
+            start = x['start_time']
+            m, s = divmod(start, 60)
+            h, m = divmod(m, 60)
+            current_dur = ':'.join([str(int(h)), str(int(m)), str(s)])
+            start = current_dur
+
+            list_of_chapters.append((str(index), str(start), str(name)))
+
         return list_of_chapters
-    with open(description_file, 'r') as f:
-        # only increment chapter number on a chapter line
-        # chapter lines start with timecode
-        line_counter = 1
-        for line in f:
-            result = re.search(r"\(?(\d?:?\d+:\d+)\)?", line)
-            try:
-                time_count = datetime.datetime.strptime(result.group(1), '%H:%M:%S')
-            except:
-                try:
-                    time_count = datetime.datetime.strptime(result.group(1), '%M:%S')
-                except:
-                    continue
-            chap_name = line.replace(result.group(0), "").rstrip(' :\n').strip("-")
-            chap_pos = datetime.datetime.strftime(time_count, '%H:%M:%S')
-            list_of_chapters.append((str(line_counter).zfill(2), chap_pos, chap_name))
-            line_counter += 1
-        f.close()
-    return list_of_chapters
+    except Exception as e:
+        print("Error reading description")
+        return list_of_chapters
 
 
 def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
@@ -259,10 +258,9 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
         file_name_with_ext = "tmp/" + file_name + '.md'
 
         if date:
-            meta_data = meta_data + f'date: {date}\n\n'
+            meta_data = meta_data + f'date: {date}\n'
 
         meta_data += '---\n'
-        print("writing .md file1")
         if test is not None or pr:
             with open(file_name_with_ext, 'a') as opf:
                 opf.write(meta_data + '\n')
@@ -270,12 +268,9 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
                 opf.close()
         if local:
             url = None
-        print("writing .md file2")
         if not pr:
-            print("writing .md file3")
             generate_payload(title=file_title, transcript=transcribed_text, media=url, tags=tags,
                              category=category, speakers=speakers, username=username, event_date=date, test=test)
-        print("writing .md file")
         return file_name_with_ext
     except Exception as e:
         print("Error writing to file")
@@ -439,8 +434,10 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
         print()
         print()
 
-        if chapters:
-            chapters = read_description(description_file=abs_path[:-4] + '.description')
+        if chapters and not test:
+            chapters = read_description("tmp/")
+        elif test:
+            chapters = read_description("test/testAssets/")
         if chapters and len(chapters) > 0:
             print("Chapters detected")
             write_chapters_file(abs_path[:-4] + '.chapters', chapters)
@@ -460,7 +457,11 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 else:
                     temp_res = ""
                 created_files.append(temp_filename)
-                result = result + "## " + chapter[2] + "\n\n" + temp_res + "\n\n"
+
+                if chapter[2].startswith("<Untitled Chapter "):
+                    result = result + "\n\n" + temp_res + "\n\n"
+                else:
+                    result = result + "## " + chapter[2] + "\n\n" + temp_res + "\n\n"
                 print()
             if not local:
                 created_files.append(abs_path)
@@ -479,10 +480,11 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                                          category=category, speakers=speakers, username=username,
                                          video_title=filename[:-4], local=local, pr=pr, test=test)
         created_files.append("tmp/" + filename[:-4] + '.description')
-        if pr:
-            create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, title=title)
-        else:
-            created_files.append(absolute_path)
+        if not test:
+            if pr:
+                create_pr(absolute_path=absolute_path, loc=loc, username=username, curr_time=curr_time, title=title)
+            else:
+                created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
         print("Error processing video")
@@ -494,6 +496,10 @@ def process_source(source, title, event_date, tags, category, speakers, loc, mod
     try:
         if not os.path.isdir("tmp"):
             os.mkdir("tmp")
+        else:
+            shutil.rmtree("tmp")
+            os.mkdir("tmp")
+
         if source_type == 'audio':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
                                      speakers=speakers, loc=loc, model=model, username=username,
@@ -531,7 +537,7 @@ def clean_up(created_files):
     for file in created_files:
         if os.path.isfile(file):
             os.remove(file)
-    os.rmdir("tmp")
+    shutil.rmtree("tmp")
 
 
 def generate_payload(title, event_date, tags, category, speakers, username, media, transcript, test):

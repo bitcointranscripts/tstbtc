@@ -1,9 +1,7 @@
-import subprocess
 import click
 from app import application
 from app import __version__, __app_name__
 from datetime import datetime
-import time
 
 
 @click.group()
