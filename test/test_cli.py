@@ -44,34 +44,24 @@ def test_download_audio_file():
     audio = application.get_audio_file("https://dcs.megaphone.fm/FPMN6776580946.mp3", "test")
     print("audio", audio)
     assert os.path.isfile("tmp/" + audio)
-    os.remove("tmp/"+audio)
+    os.remove("tmp/" + audio)
 
 
 def test_download_video_file():
+    if not os.path.isdir('tmp'):
+        os.mkdir('tmp')
     url = "https://www.youtube.com/watch?v=B0HW_sJ503Y"
     video = application.download_video(url)
-    assert os.path.isfile(video) and os.path.isfile(video[:-3] + "description")
+    assert os.path.isfile(video) and os.path.isfile('tmp/videoFile.info.json')
     print()
     os.remove(video)
-    os.remove(video[:-3] + "description")
-
-
-@pytest.mark.main
-def test_chapter_creation():
-    chapters = application.read_description("test/testAssets/test_video.description")
-    with open("test/testAssets/test_video_1.chapters", "w") as file:
-        file.write(str(chapters))
-    with open("test/testAssets/test_video_1.chapters", "r") as file:
-        data = str(file.read().strip("\n"))
-        with open("test/testAssets/test_video_chapters.chapters", "r") as file:
-            chapters = str(file.read().strip("\n"))
-            assert data == chapters
-    os.remove("test/testAssets/test_video_1.chapters")
+    os.remove('tmp/videoFile.info.json')
+    shutil.rmtree('tmp')
 
 
 @pytest.mark.main
 def test_split_video():
-    chapters = application.read_description("test/testAssets/test_video.description")
+    chapters = application.read_description("test/testAssets/")
     application.split_mp4(chapters, "test/testAssets/test_video.mp4", "test/testAssets/test_video")
     is_pass = True
     for i in range(3):

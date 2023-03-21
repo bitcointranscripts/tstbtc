@@ -139,15 +139,16 @@ def test_video_with_chapters():
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
                                           speakers=speakers, loc="yada/yada", model="tiny", username=username,
                                           source_type="video", local=True,
-                                          created_files=created_files, test=result, chapters=True)
+                                          created_files=created_files, test=result, chapters=True, pr=True)
     chapter_names = []
-    with open("test/testAssets/test_video.chapters", "r") as file:
+    with open("test/testAssets/test_video_chapters.chapters", "r") as file:
         result = file.read()
         for x in result.split('\n'):
             if re.search("CHAPTER\d\dNAME", x):
                 chapter_names.append(x.split("= ")[1].strip())
         file.close()
 
+    print(filename)
     assert os.path.isfile(filename)
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
