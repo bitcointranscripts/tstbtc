@@ -26,7 +26,7 @@ def print_help(ctx, param, value):
 @click.command()
 @click.argument('source', nargs=1)
 @click.argument('loc', nargs=1)
-@click.option('-m', '--model', type=click.Choice(['tiny', 'base', 'small', 'medium', 'large']), default='tiny',
+@click.option('-m', '--model', type=click.Choice(['tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large-v2']), default='tiny.en',
               help='Options for transcription model'
               )
 @click.option('-t', '--title', type=str,

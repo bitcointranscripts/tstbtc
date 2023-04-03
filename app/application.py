@@ -5,7 +5,7 @@ import subprocess
 from clint.textui import progress
 import pytube
 from moviepy.editor import VideoFileClip
-import pywhisper
+import whisper
 import os
 import static_ffmpeg
 from app import __version__
@@ -168,7 +168,7 @@ def get_playlist_videos(url):
 
 def audio_to_text(filename):
     try:
-        model = pywhisper.load_model("base")
+        model = whisper.load_model("base")
         result = model.transcribe(filename)
         sonuc = result["text"]
         return sonuc
@@ -198,7 +198,7 @@ def get_audio_file(url, title):
 def process_mp3(filename, model):
     print("Transcribing audio to text...")
     try:
-        mymodel = pywhisper.load_model(model)
+        mymodel = whisper.load_model(model)
         result = mymodel.transcribe(filename[:-4] + ".mp3")
         result = result["text"]
         print("Removed video and audio files")
