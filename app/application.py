@@ -165,18 +165,6 @@ def get_playlist_videos(url):
         print(e)
         return
 
-
-def audio_to_text(filename):
-    try:
-        model = whisper.load_model("base")
-        result = model.transcribe(filename)
-        sonuc = result["text"]
-        return sonuc
-    except Exception as e:
-        print("Error converting audio to text")
-        print(e)
-
-
 def get_audio_file(url, title):
     print("URL: " + url)
     print("downloading audio file")
