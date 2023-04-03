@@ -71,25 +71,6 @@ For demonstration purposes, let's substitute the link above with the following: 
 
 ## Testing
 
-To run the tests, run the below command:
-
-`cd test`
-
-To run the unit tests 
-
-`pytest -v -m main -s`
-
-To run the feature tests
-
-`pytest -v -m feature -s`
-
-To run the full test suite
-
-`pytest -v -s`
-
-
-## Testing
-
 To run the unit tests 
 
 `pytest -v -m main -s`
