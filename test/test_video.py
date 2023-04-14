@@ -168,7 +168,7 @@ def test_generate_payload():
     with open("test/testAssets/transcript.txt", "r") as file:
         transcript = file.read()
         file.close()
-    payload = application.generate_payload(title="test_title", event_date=date, tags="tag1, tag2", test=True,
+    payload = application.generate_payload(loc="yada/yada", title="test_title", event_date=date, tags="tag1, tag2", test=True,
                                            category="category1, category2", speakers="speaker1, speaker2",
                                            username="username", media="test/testAssets/test_video.mp4",
                                            transcript=transcript)
