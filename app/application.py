@@ -211,7 +211,7 @@ def initialize():
         print(e)
 
 
-def write_to_file(result, url, title, date, tags, category, speakers, video_title, username, local, test, pr):
+def write_to_file(result, loc, url, title, date, tags, category, speakers, video_title, username, local, test, pr):
     try:
         transcribed_text = result
         if title:
@@ -257,7 +257,7 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
         if local:
             url = None
         if not pr:
-            generate_payload(title=file_title, transcript=transcribed_text, media=url, tags=tags,
+            generate_payload(loc=loc, title=file_title, transcript=transcribed_text, media=url, tags=tags,
                              category=category, speakers=speakers, username=username, event_date=date, test=test)
         return file_name_with_ext
     except Exception as e:
@@ -265,11 +265,11 @@ def write_to_file(result, url, title, date, tags, category, speakers, video_titl
         print(e)
 
 
-def get_md_file_path(result, video, title, event_date, tags, category, speakers, username, local, video_title, test,
+def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title, test,
                      pr):
     try:
         print("writing .md file")
-        file_name_with_ext = write_to_file(result, video, title, event_date, tags, category, speakers, video_title,
+        file_name_with_ext = write_to_file(result, loc, video, title, event_date, tags, category, speakers, video_title,
                                            username, local, test, pr)
         print("wrote .md file")
 
@@ -350,7 +350,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
             result = test
         else:
             result = process_mp3(abs_path, model)
-        absolute_path = get_md_file_path(result=result, video=source, title=title, event_date=event_date, tags=tags,
+        absolute_path = get_md_file_path(result=result, loc=loc, video=source, title=title, event_date=event_date, tags=tags,
                                          category=category, speakers=speakers, username=username, local=local,
                                          video_title=filename[:-4], test=test, pr=pr)
 
@@ -464,7 +464,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 result = ""
         if not title:
             title = filename[:-4]
-        absolute_path = get_md_file_path(result=result, video=video, title=title, event_date=event_date, tags=tags,
+        absolute_path = get_md_file_path(result=result, loc=loc, video=video, title=title, event_date=event_date, tags=tags,
                                          category=category, speakers=speakers, username=username,
                                          video_title=filename[:-4], local=local, pr=pr, test=test)
         created_files.append("tmp/" + filename[:-4] + '.description')
@@ -528,7 +528,7 @@ def clean_up(created_files):
     shutil.rmtree("tmp")
 
 
-def generate_payload(title, event_date, tags, category, speakers, username, media, transcript, test):
+def generate_payload(loc, title, event_date, tags, category, speakers, username, media, transcript, test):
     try:
         event_date = event_date if event_date is None else event_date if type(
             event_date) is str else event_date.strftime('%Y-%m-%d')
@@ -540,6 +540,7 @@ def generate_payload(title, event_date, tags, category, speakers, username, medi
             "speakers": str(speakers),
             "date": event_date,
             "media": media,
+            "loc": loc,
             "body": transcript
         }
         content = {'content': data}
