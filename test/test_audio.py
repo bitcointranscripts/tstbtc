@@ -49,7 +49,7 @@ def test_audio_with_title():
     username = "username"
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=None, tags=None, category=None,
-                                          speakers=None, loc="yada/yada", model="tiny", username=username,
+                                          speakers=None, loc="yada/yada", username=username,
                                           source_type="audio", local=True, test=result, chapters=False, pr=False,
                                           created_files=created_files)
     assert os.path.isfile(filename)
@@ -68,7 +68,7 @@ def test_audio_without_title():
     created_files = []
     title = None
     filename = application.process_source(source=source, title=title, event_date=None, tags=None, category=None,
-                                          speakers=None, loc="yada/yada", model="tiny", username=username, pr=False,
+                                          speakers=None, loc="yada/yada", username=username, pr=False,
                                           source_type="audio", local=True, created_files=created_files, test=result,
                                           chapters=False)
     assert filename is None
@@ -91,7 +91,7 @@ def test_audio_with_all_data():
     date = datetime.strptime(date, '%Y-%m-%d').date()
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
-                                          speakers=speakers, loc="yada/yada", model="tiny", username=username,
+                                          speakers=speakers, loc="yada/yada", username=username,
                                           source_type="audio", local=True, test=result, chapters=False,
                                           created_files=created_files, pr=False)
     category = [cat.strip() for cat in category.split(",")]

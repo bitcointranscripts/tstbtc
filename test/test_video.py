@@ -81,7 +81,7 @@ def test_video_with_title():
     date = None
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
-                                          speakers=speakers, loc="yada/yada", model="tiny", username=username,
+                                          speakers=speakers, loc="yada/yada", username=username,
                                           source_type="video", local=True,
                                           created_files=created_files, test=result, chapters=False)
     assert os.path.isfile(filename)
@@ -107,7 +107,7 @@ def test_video_with_all_options():
     date = datetime.strptime(date, '%Y-%m-%d').date()
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
-                                          speakers=speakers, loc="yada/yada", model="tiny", username=username,
+                                          speakers=speakers, loc="yada/yada", username=username,
                                           source_type="video", local=True,
                                           created_files=created_files, test=True, chapters=False)
     assert os.path.isfile(filename)
@@ -137,7 +137,7 @@ def test_video_with_chapters():
     date = datetime.strptime(date, '%Y-%m-%d').date()
     created_files = []
     filename = application.process_source(source=source, title=title, event_date=date, tags=tags, category=category,
-                                          speakers=speakers, loc="yada/yada", model="tiny", username=username,
+                                          speakers=speakers, loc="yada/yada", username=username,
                                           source_type="video", local=True,
                                           created_files=created_files, test=result, chapters=True, pr=True)
     chapter_names = []
