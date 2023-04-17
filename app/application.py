@@ -5,7 +5,6 @@ import subprocess
 from clint.textui import progress
 import pytube
 from moviepy.editor import VideoFileClip
-import whisper
 import os
 import static_ffmpeg
 from app import __version__
@@ -15,6 +14,8 @@ from urllib.parse import urlparse, parse_qs
 import time
 from dotenv import dotenv_values
 import yt_dlp
+from deepgram import Deepgram
+import mimetypes
 
 
 def download_video(url):
@@ -165,6 +166,7 @@ def get_playlist_videos(url):
         print(e)
         return
 
+
 def get_audio_file(url, title):
     print("URL: " + url)
     print("downloading audio file")
@@ -183,14 +185,42 @@ def get_audio_file(url, title):
         return
 
 
+def decimal_to_sexagesimal(dec):
+    sec = int(dec % 60)
+    minu = int((dec // 60) % 60)
+    hrs = int((dec // 60) // 60)
+
+    return f'{hrs}:{minu}:{sec}'
+
+
 def process_mp3(filename, model):
     print("Transcribing audio to text...")
     try:
-        mymodel = whisper.load_model(model)
-        result = mymodel.transcribe(filename[:-4] + ".mp3")
-        result = result["text"]
-        print("Removed video and audio files")
-        return result
+        config = dotenv_values(".env")
+        dg_client = Deepgram(config["DEEPGRAM_API_KEY"])
+
+        with open(filename, "rb") as audio:
+            mimeType = mimetypes.MimeTypes().guess_type(filename)[0]
+            source = {'buffer': audio, 'mimetype': mimeType}
+            response = dg_client.transcription.sync_prerecorded(source, {'punctuate': True, 'speaker_labels': True,
+                                                                         'diarize': True, 'smart_formatting': True})
+            para = ""
+            string = ""
+            curr_speaker = None
+            for word in response["results"]["channels"][0]["alternatives"][0]["words"]:
+                if word["speaker"] != curr_speaker:
+                    if para != "":
+                        para = para.strip(" ")
+                        string = string + para + "\n\n"
+                    para = ""
+                    string = string + f'Speaker {word["speaker"]}: {decimal_to_sexagesimal(word["start"])}'
+                    curr_speaker = word["speaker"]
+                    string = string + '\n\n'
+
+                para = para + " " + word["punctuated_word"]
+            para = para.strip(" ")
+            string = string + para
+            return string
     except Exception as e:
         print("Error transcribing audio to text")
         print(e)
@@ -265,7 +295,8 @@ def write_to_file(result, loc, url, title, date, tags, category, speakers, video
         print(e)
 
 
-def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title, test,
+def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title,
+                     test,
                      pr):
     try:
         print("writing .md file")
@@ -350,7 +381,8 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
             result = test
         else:
             result = process_mp3(abs_path, model)
-        absolute_path = get_md_file_path(result=result, loc=loc, video=source, title=title, event_date=event_date, tags=tags,
+        absolute_path = get_md_file_path(result=result, loc=loc, video=source, title=title, event_date=event_date,
+                                         tags=tags,
                                          category=category, speakers=speakers, username=username, local=local,
                                          video_title=filename[:-4], test=test, pr=pr)
 
