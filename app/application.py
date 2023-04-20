@@ -193,7 +193,7 @@ def decimal_to_sexagesimal(dec):
     return f'{hrs}:{minu}:{sec}'
 
 
-def process_mp3(filename):
+def process_mp3(filename, model):
     print("Transcribing audio to text...")
     try:
         config = dotenv_values(".env")
@@ -352,7 +352,7 @@ def check_source_type(source):
         return None
 
 
-def process_audio(source, title, event_date, tags, category, speakers, loc, username, local,
+def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, local,
                   created_files, test, pr):
     try:
         print("audio file detected")
@@ -380,7 +380,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, user
         if test:
             result = test
         else:
-            result = process_mp3(abs_path)
+            result = process_mp3(abs_path, model)
         absolute_path = get_md_file_path(result=result, loc=loc, video=source, title=title, event_date=event_date,
                                          tags=tags,
                                          category=category, speakers=speakers, username=username, local=local,
@@ -397,7 +397,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, user
         print(e)
 
 
-def process_videos(source, title, event_date, tags, category, speakers, loc, username, created_files,
+def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, created_files,
                    chapters, pr):
     try:
         print("Playlist detected")
@@ -411,11 +411,12 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, use
             print("Playlist is empty")
             return
 
+        selected_model = model + '.en'
         filename = ""
 
         for video in videos:
             filename = process_video(video=video, title=title, event_date=event_date, tags=tags, category=category,
-                                     speakers=speakers, loc=loc, username=username,
+                                     speakers=speakers, loc=loc, model=selected_model, username=username,
                                      pr=pr, created_files=created_files, chapters=chapters, test=False)
             if filename is None:
                 return None
@@ -425,7 +426,7 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, use
         print(e)
 
 
-def process_video(video, title, event_date, tags, category, speakers, loc, username, created_files,
+def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
                   chapters, test, pr, local=False):
     try:
         result = ""
@@ -471,7 +472,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, usern
                     if file is None:
                         print("File not found")
                         return None
-                    temp_res = process_mp3(filename=temp_filename)
+                    temp_res = process_mp3(filename=temp_filename, model=model)
                     created_files.append(temp_filename[:-4] + ".mp3")
                 else:
                     temp_res = ""
@@ -489,7 +490,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, usern
             if not test:
                 convert_video_to_mp3(abs_path)
                 created_files.append(abs_path[:-4] + '.mp3')
-                result = process_mp3(abs_path[:-4] + '.mp3')
+                result = process_mp3(abs_path[:-4] + '.mp3', model)
                 created_files.append(abs_path[:-4] + ".mp3")
             else:
                 result = ""
@@ -510,7 +511,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, usern
         print(e)
 
 
-def process_source(source, title, event_date, tags, category, speakers, loc, username, source_type,
+def process_source(source, title, event_date, tags, category, speakers, loc, model, username, source_type,
                    created_files, chapters, local=False, test=None, pr=False):
     try:
         if not os.path.isdir("tmp"):
@@ -521,24 +522,24 @@ def process_source(source, title, event_date, tags, category, speakers, loc, use
 
         if source_type == 'audio':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
-                                     speakers=speakers, loc=loc, username=username,
+                                     speakers=speakers, loc=loc, model=model, username=username,
                                      local=local, created_files=created_files, test=test, pr=pr)
         elif source_type == 'audio-local':
             filename = process_audio(source=source, title=title, event_date=event_date, tags=tags, category=category,
-                                     speakers=speakers, loc=loc, username=username,
+                                     speakers=speakers, loc=loc, model=model, username=username,
                                      local=True, created_files=created_files, test=test, pr=pr)
         elif source_type == 'playlist':
             filename = process_videos(source=source, title=title, event_date=event_date, tags=tags, category=category,
-                                      speakers=speakers, loc=loc, username=username,
+                                      speakers=speakers, loc=loc, model=model, username=username,
                                       created_files=created_files, chapters=chapters, pr=pr)
         elif source_type == 'video-local':
             filename = process_video(video=source, title=title, event_date=event_date,
-                                     tags=tags, category=category, speakers=speakers, loc=loc,
+                                     tags=tags, category=category, speakers=speakers, loc=loc, model=model,
                                      username=username, created_files=created_files, local=True,
                                      chapters=chapters, test=test, pr=pr)
         else:
             filename = process_video(video=source, title=title, event_date=event_date,
-                                     tags=tags, category=category, speakers=speakers, loc=loc,
+                                     tags=tags, category=category, speakers=speakers, loc=loc, model=model,
                                      username=username, created_files=created_files, local=local,
                                      chapters=chapters, test=test, pr=pr)
         return filename

@@ -26,6 +26,9 @@ def print_help(ctx, param, value):
 @click.command()
 @click.argument('source', nargs=1)
 @click.argument('loc', nargs=1)
+@click.option('-m', '--model', type=click.Choice(['tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large-v2']), default='tiny.en',
+              help='Options for transcription model'
+              )
 @click.option('-t', '--title', type=str,
               help="Supply transcribed file title in 'quotes', title is mandatory in case of audio files")
 @click.option('-d', '--date', type=str, help="Supply the event date in format 'yyyy-mm-dd'")
@@ -44,6 +47,7 @@ def print_help(ctx, param, value):
 def add(
         source: str,
         loc: str,
+        model: str,
         title: str,
         date: str,
         tags: str,
@@ -72,7 +76,7 @@ def add(
             print("Invalid source")
             return
         filename = application.process_source(source=source, title=title, event_date=event_date, tags=tags,
-                                              category=category, speakers=speakers, loc=loc,
+                                              category=category, speakers=speakers, loc=loc, model=model,
                                               username=username, chapters=chapters, pr=pr,
                                               source_type=source_type, created_files=created_files)
         if filename:
