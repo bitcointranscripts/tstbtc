@@ -55,19 +55,13 @@ def read_description(prefix):
             return list_of_chapters
         for index, x in enumerate(info['chapters']):
             name = x['title']
-
             start = x['start_time']
-            m, s = divmod(start, 60)
-            h, m = divmod(m, 60)
-            current_dur = ':'.join([str(int(h)), str(int(m)), str(s)])
-            start = current_dur
-
-            list_of_chapters.append((str(index), str(start), str(name)))
+            list_of_chapters.append((str(index), start, str(name)))
 
         return list_of_chapters
     except Exception as e:
         print("Error reading description")
-        return list_of_chapters
+        return []
 
 
 def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
@@ -82,33 +76,6 @@ def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
             fo.close()
     except Exception as e:
         print("Error writing chapter file")
-        print(e)
-
-
-def split_mp4(chapters: list, download_filename: str, download_name: str) -> None:
-    try:
-        current_duration_pretext = subprocess.run(['ffprobe', '-i', download_filename,
-                                                   '-show_entries', 'format=duration',
-                                                   '-v', 'quiet'],
-                                                  capture_output=True, encoding='UTF8')
-        current_duration = float(current_duration_pretext.stdout[18:-13])
-        m, s = divmod(current_duration, 60)
-        h, m = divmod(m, 60)
-        current_dur = ':'.join([str(int(h)), str(int(m)), str(s)])
-        for current_index, current_chapter in enumerate(chapters):
-            # current_chapter will be a tuple: position, timecode, name
-            next_index = current_index + 1
-            start_time = current_chapter[1]
-            try:
-                end_time = chapters[next_index][1]
-            except:
-                end_time = current_dur
-            output_name = f'{download_name} - ({current_index}).mp4'
-            subprocess.run(["ffmpeg", "-ss", start_time, "-to", end_time,
-                            "-i", download_filename, "-acodec", "copy",
-                            "-vcodec", "copy", output_name, "-loglevel", "quiet"])
-    except Exception as e:
-        print("Error splitting mp4")
         print(e)
 
 
@@ -165,6 +132,7 @@ def get_playlist_videos(url):
         print(e)
         return
 
+
 def get_audio_file(url, title):
     print("URL: " + url)
     print("downloading audio file")
@@ -186,15 +154,25 @@ def get_audio_file(url, title):
 def process_mp3(filename, model):
     print("Transcribing audio to text...")
     try:
-        mymodel = whisper.load_model(model)
-        result = mymodel.transcribe(filename[:-4] + ".mp3")
-        result = result["text"]
+        my_model = whisper.load_model(model)
+        result = my_model.transcribe(filename)
+        data = []
+        for x in result["segments"]:
+            data.append(tuple((x["start"], x["end"], x["text"])))
         print("Removed video and audio files")
-        return result
+        return data
     except Exception as e:
         print("Error transcribing audio to text")
         print(e)
         return
+
+
+def create_transcript(data):
+    result = ""
+    for x in data:
+        result = result + x[2] + " "
+
+    return result
 
 
 def initialize():
@@ -265,7 +243,8 @@ def write_to_file(result, loc, url, title, date, tags, category, speakers, video
         print(e)
 
 
-def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title, test,
+def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title,
+                     test,
                      pr):
     try:
         print("writing .md file")
@@ -334,7 +313,9 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
         # process audio file
         if not local:
             filename = get_audio_file(url=source, title=title)
-            abs_path = os.path.abspath(path=filename)
+            abs_path = os.path.abspath(path="tmp/" + filename)
+            print("filename", filename)
+            print("abs_path", abs_path)
             created_files.append(abs_path)
         else:
             filename = source.split("/")[-1]
@@ -344,13 +325,16 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
             print("File not found")
             return
         if filename.endswith('wav'):
+            initialize()
             abs_path = convert_wav_to_mp3(abs_path=abs_path, filename=filename)
             created_files.append(abs_path)
         if test:
             result = test
         else:
             result = process_mp3(abs_path, model)
-        absolute_path = get_md_file_path(result=result, loc=loc, video=source, title=title, event_date=event_date, tags=tags,
+            result = create_transcript(result)
+        absolute_path = get_md_file_path(result=result, loc=loc, video=source, title=title, event_date=event_date,
+                                         tags=tags,
                                          category=category, speakers=speakers, username=username, local=local,
                                          video_title=filename[:-4], test=test, pr=pr)
 
@@ -394,10 +378,34 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
         print(e)
 
 
+def combine_chapter(chapters, transcript):
+    chapters_pointer = 0
+    transcript_pointer = 0
+    result = ""
+    # chapters index, start time, name
+    # transcript start time, end time, text
+
+    while chapters_pointer < len(chapters) and transcript_pointer < len(transcript):
+        if chapters[chapters_pointer][1] <= transcript[transcript_pointer][0]:
+            result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
+            chapters_pointer += 1
+        else:
+            result = result + transcript[transcript_pointer][2]
+            transcript_pointer += 1
+
+    while transcript_pointer < len(transcript):
+        result = result + transcript[transcript_pointer][2]
+        transcript_pointer += 1
+
+    with open("result.md", "w") as file:
+        file.write(result)
+
+    return result
+
+
 def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
                   chapters, test, pr, local=False):
     try:
-        result = ""
         curr_time = str(round(time.time() * 1000))
         if not local:
             if "watch?v=" in video:
@@ -422,49 +430,31 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
         print()
         print()
 
+        initialize()
         if chapters and not test:
             chapters = read_description("tmp/")
         elif test:
             chapters = read_description("test/testAssets/")
+        convert_video_to_mp3(abs_path[:-4] + '.mp4')
+        result = process_mp3(abs_path[:-4] + ".mp3", model)
+        created_files.append(abs_path[:-4] + ".mp3")
         if chapters and len(chapters) > 0:
             print("Chapters detected")
             write_chapters_file(abs_path[:-4] + '.chapters', chapters)
             created_files.append(abs_path[:-4] + '.chapters')
-            split_mp4(chapters=chapters, download_filename=abs_path, download_name=abs_path[:-4])
-            initialize()
-            for current_index, chapter in enumerate(chapters):
-                print(f"Processing chapter {chapter[2]} {current_index + 1} of {len(chapters)}")
-                temp_filename = f'{abs_path[:-4]} - ({current_index}).mp4'
-                if not test:
-                    file = convert_video_to_mp3(filename=temp_filename)
-                    if file is None:
-                        print("File not found")
-                        return None
-                    temp_res = process_mp3(filename=temp_filename, model=model)
-                    created_files.append(temp_filename[:-4] + ".mp3")
-                else:
-                    temp_res = ""
-                created_files.append(temp_filename)
-
-                if chapter[2].startswith("<Untitled Chapter "):
-                    result = result + "\n\n" + temp_res + "\n\n"
-                else:
-                    result = result + "## " + chapter[2] + "\n\n" + temp_res + "\n\n"
-                print()
+            result = combine_chapter(chapters=chapters, transcript=result)
             if not local:
                 created_files.append(abs_path)
             created_files.append("tmp/" + filename[:-4] + '.chapters')
         else:
             if not test:
-                convert_video_to_mp3(abs_path)
-                created_files.append(abs_path[:-4] + '.mp3')
-                result = process_mp3(abs_path[:-4] + '.mp3', model)
-                created_files.append(abs_path[:-4] + ".mp3")
+                result = create_transcript(result)
             else:
                 result = ""
         if not title:
             title = filename[:-4]
-        absolute_path = get_md_file_path(result=result, loc=loc, video=video, title=title, event_date=event_date, tags=tags,
+        absolute_path = get_md_file_path(result=result, loc=loc, video=video, title=title, event_date=event_date,
+                                         tags=tags,
                                          category=category, speakers=speakers, username=username,
                                          video_title=filename[:-4], local=local, pr=pr, test=test)
         created_files.append("tmp/" + filename[:-4] + '.description')
