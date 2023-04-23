@@ -57,6 +57,7 @@ To include optional metadata in your transcript, you can add the following param
 - `-c` or `--category`: Supply the category for the transcript in 'quotes' and separated by commas
 - `-C` or `--chapters`: Split the transcript into chapters based on the supplied timestamps in the youtube video.
 - `-p` or `--pr`: Open a PR on the bitcointranscripts repo
+- `-m` or `model`: Supply optional whisper model
 
 #### Examples
 To transcribe [this podcast episode](https://www.youtube.com/watch?v=Nq6WxJ0PgJ4) from Stephan Livera's podcast with the associated metadata, we would run either of the below commands. The first uses short argument tags, while the second uses long argument tags. The result is the same.
