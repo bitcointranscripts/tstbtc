@@ -292,7 +292,7 @@ def write_to_file(result, loc, url, title, date, tags, category, speakers, video
         file_name_with_ext = "tmp/" + file_name + '.md'
 
         if date:
-            meta_data = meta_data + f'date: {date}\n'
+            meta_data += f'date: {date}\n'
 
         meta_data += '---\n'
         if test is not None or pr:
@@ -312,7 +312,7 @@ def write_to_file(result, loc, url, title, date, tags, category, speakers, video
 
 
 def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title,
-                     test, pr, summary=None):
+                     test, pr, summary=""):
     try:
         print("writing .md file")
         file_name_with_ext = write_to_file(result, loc, video, title, event_date, tags, category, speakers, video_title,
@@ -379,6 +379,7 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
             return None
         # process audio file
         summary = None
+        result = None
         if not local:
             filename = get_audio_file(url=source, title=title)
             abs_path = os.path.abspath(path="tmp/" + filename)
@@ -452,29 +453,54 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
         print(e)
 
 
-def combine_chapter(chapters, transcript):
-    chapters_pointer = 0
-    transcript_pointer = 0
-    result = ""
-    # chapters index, start time, name
-    # transcript start time, end time, text
+def combine_deepgram_with_chapters(deepgram_data, chapters):
+    try:
+        chapters_pointer = 0
+        words_pointer = 0
+        result = ""
+        words = deepgram_data["results"]["channels"][0]["alternatives"][0]["words"]
+        # chapters index, start time, name
+        # transcript start time, end time, text
+        while chapters_pointer < len(chapters) and words_pointer < len(words):
+            if chapters[chapters_pointer][1] <= words[words_pointer]["end"]:
+                result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
+                chapters_pointer += 1
+            else:
+                result = result + words[words_pointer]["punctuated_word"] + " "
+                words_pointer += 1
+        return result
+    except Exception as e:
+        print("Error combining deepgram with chapters")
+        print(e)
 
-    while chapters_pointer < len(chapters) and transcript_pointer < len(transcript):
-        if chapters[chapters_pointer][1] <= transcript[transcript_pointer][0]:
-            result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
-            chapters_pointer += 1
-        else:
+
+def combine_chapter(chapters, transcript):
+    try:
+        chapters_pointer = 0
+        transcript_pointer = 0
+        result = ""
+        # chapters index, start time, name
+        # transcript start time, end time, text
+
+        while chapters_pointer < len(chapters) and transcript_pointer < len(transcript):
+            if chapters[chapters_pointer][1] <= transcript[transcript_pointer][0]:
+                result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
+                chapters_pointer += 1
+            else:
+                result = result + transcript[transcript_pointer][2]
+                transcript_pointer += 1
+
+        while transcript_pointer < len(transcript):
             result = result + transcript[transcript_pointer][2]
             transcript_pointer += 1
 
-    while transcript_pointer < len(transcript):
-        result = result + transcript[transcript_pointer][2]
-        transcript_pointer += 1
+        with open("result.md", "w") as file:
+            file.write(result)
 
-    with open("result.md", "w") as file:
-        file.write(result)
-
-    return result
+        return result
+    except Exception as e:
+        print("Error combining chapters")
+        print(e)
 
 
 def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
@@ -506,6 +532,8 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
 
         initialize()
         summary = None
+        result = ""
+        deepgram_data = None
         if chapters and not test:
             chapters = read_description("tmp/")
         elif test:
@@ -517,7 +545,6 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
             if summarize:
                 print("Summarizing")
                 summary = get_deepgram_summary(deepgram_data=deepgram_data)
-                print(summary)
         if not deepgram:
             result = process_mp3(abs_path[:-4] + ".mp3", model)
         created_files.append(abs_path[:-4] + ".mp3")
@@ -525,7 +552,10 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
             print("Chapters detected")
             write_chapters_file(abs_path[:-4] + '.chapters', chapters)
             created_files.append(abs_path[:-4] + '.chapters')
-            result = combine_chapter(chapters=chapters, transcript=result)
+            if deepgram:
+                result = combine_deepgram_with_chapters(deepgram_data=deepgram_data, chapters=chapters)
+            else:
+                result = combine_chapter(chapters=chapters, transcript=result)
             if not local:
                 created_files.append(abs_path)
             created_files.append("tmp/" + filename[:-4] + '.chapters')
