@@ -174,7 +174,7 @@ def decimal_to_sexagesimal(dec):
     minu = int((dec // 60) % 60)
     hrs = int((dec // 60) // 60)
 
-    return f'{hrs}:{minu}:{sec}'
+    return f'{hrs:02d}:{minu:02d}:{sec:02d}'
 
 
 def get_deepgram_transcript(deepgram_data, diarize):
