@@ -177,6 +177,85 @@ def decimal_to_sexagesimal(dec):
     return f'{hrs:02d}:{minu:02d}:{sec:02d}'
 
 
+def combine_chapter(chapters, transcript):
+    try:
+        chapters_pointer = 0
+        transcript_pointer = 0
+        result = ""
+        # chapters index, start time, name
+        # transcript start time, end time, text
+
+        while chapters_pointer < len(chapters) and transcript_pointer < len(transcript):
+            if chapters[chapters_pointer][1] <= transcript[transcript_pointer][0]:
+                result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
+                chapters_pointer += 1
+            else:
+                result = result + transcript[transcript_pointer][2]
+                transcript_pointer += 1
+
+        while transcript_pointer < len(transcript):
+            result = result + transcript[transcript_pointer][2]
+            transcript_pointer += 1
+
+        with open("result.md", "w") as file:
+            file.write(result)
+
+        return result
+    except Exception as e:
+        print("Error combining chapters")
+        print(e)
+
+
+def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
+    try:
+        para = ""
+        string = ""
+        curr_speaker = None
+        words = deepgram_data["results"]["channels"][0]["alternatives"][0]["words"]
+        words_pointer = 0
+        chapters_pointer = 0
+        while chapters_pointer < len(chapters) and words_pointer < len(words):
+            if chapters[chapters_pointer][1] <= words[words_pointer]["start"]:
+                if para != "":
+                    para = para.strip(" ")
+                    string = string + para + "\n\n"
+                para = ""
+                string = string + f'## {chapters[chapters_pointer][2]}\n\n'
+                chapters_pointer += 1
+            else:
+                if words[words_pointer]["speaker"] != curr_speaker:
+                    if para != "":
+                        para = para.strip(" ")
+                        string = string + para + "\n\n"
+                    para = ""
+                    string = string + f'Speaker {words[words_pointer]["speaker"]}:' \
+                                      f' {decimal_to_sexagesimal(words[words_pointer]["start"])}'
+                    curr_speaker = words[words_pointer]["speaker"]
+                    string = string + '\n\n'
+
+                para = para + " " + words[words_pointer]["punctuated_word"]
+                words_pointer += 1
+        while words_pointer < len(words):
+            if words[words_pointer]["speaker"] != curr_speaker:
+                if para != "":
+                    para = para.strip(" ")
+                    string = string + para + "\n\n"
+                para = ""
+                string = string + f'Speaker {words[words_pointer]["speaker"]}:' \
+                                  f' {decimal_to_sexagesimal(words[words_pointer]["start"])}'
+                curr_speaker = words[words_pointer]["speaker"]
+                string = string + '\n\n'
+
+            para = para + " " + words[words_pointer]["punctuated_word"]
+            words_pointer += 1
+        para = para.strip(" ")
+        string = string + para
+        return string
+    except Exception as e:
+        print("Error combining deepgram chapters")
+        print(e)
+
+
 def get_deepgram_transcript(deepgram_data, diarize):
     if diarize:
         para = ""
@@ -483,35 +562,6 @@ def combine_deepgram_with_chapters(deepgram_data, chapters):
         print(e)
 
 
-def combine_chapter(chapters, transcript):
-    try:
-        chapters_pointer = 0
-        transcript_pointer = 0
-        result = ""
-        # chapters index, start time, name
-        # transcript start time, end time, text
-
-        while chapters_pointer < len(chapters) and transcript_pointer < len(transcript):
-            if chapters[chapters_pointer][1] <= transcript[transcript_pointer][0]:
-                result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
-                chapters_pointer += 1
-            else:
-                result = result + transcript[transcript_pointer][2]
-                transcript_pointer += 1
-
-        while transcript_pointer < len(transcript):
-            result = result + transcript[transcript_pointer][2]
-            transcript_pointer += 1
-
-        with open("result.md", "w") as file:
-            file.write(result)
-
-        return result
-    except Exception as e:
-        print("Error combining chapters")
-        print(e)
-
-
 def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
                   chapters, test, pr, local=False, deepgram=False, summarize=False, diarize=False):
     try:
@@ -562,7 +612,10 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
             write_chapters_file(abs_path[:-4] + '.chapters', chapters)
             created_files.append(abs_path[:-4] + '.chapters')
             if deepgram:
-                result = combine_deepgram_with_chapters(deepgram_data=deepgram_data, chapters=chapters)
+                if diarize:
+                    result = combine_deepgram_chapters_with_diarization(deepgram_data=deepgram_data, chapters=chapters)
+                else:
+                    result = combine_deepgram_with_chapters(deepgram_data=deepgram_data, chapters=chapters)
             else:
                 result = combine_chapter(chapters=chapters, transcript=result)
             if not local:

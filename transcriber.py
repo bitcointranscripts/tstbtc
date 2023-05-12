@@ -47,7 +47,8 @@ def print_help(ctx, param, value):
 @click.option('-D', '--deepgram', is_flag=True, default=False, help="Supply this flag if you want to use deepgram")
 @click.option('-S', '--summarize', is_flag=True, default=False,
               help="Supply this flag if you want to summarize the content")
-@click.option('-M', '--diarize', is_flag=True, default=False, help="Supply this flag if you have multiple speakers AKA want to diarize the content")
+@click.option('-M', '--diarize', is_flag=True, default=False, help="Supply this flag if you have multiple speakers AKA "
+                                                                   "want to diarize the content")
 def add(
         source: str,
         loc: str,
