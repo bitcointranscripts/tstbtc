@@ -468,6 +468,15 @@ def combine_deepgram_with_chapters(deepgram_data, chapters):
             else:
                 result = result + words[words_pointer]["punctuated_word"] + " "
                 words_pointer += 1
+
+        # Append the final chapter heading and remaining content
+        while chapters_pointer < len(chapters):
+            result = result + "\n\n## " + chapters[chapters_pointer][2] + "\n\n"
+            chapters_pointer += 1
+        while words_pointer < len(words):
+            result = result + words[words_pointer]["punctuated_word"] + " "
+            words_pointer += 1
+
         return result
     except Exception as e:
         print("Error combining deepgram with chapters")
