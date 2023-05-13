@@ -534,7 +534,7 @@ def generate_payload(loc, title, event_date, tags, category, speakers, username,
             event_date) is str else event_date.strftime('%Y-%m-%d')
         data = {
             "title": title,
-            "transcript_by": f'{username} via TBTBTC v{__version__}\n',
+            "transcript_by": f'{username} via TBTBTC v{__version__}',
             "categories": str(category),
             "tags": str(tags),
             "speakers": str(speakers),
