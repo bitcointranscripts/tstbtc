@@ -9,3 +9,4 @@ requests==2.28.2
 setuptools==45.2.0
 static_ffmpeg==2.3
 yt_dlp==2023.3.4
+deepgram-sdk==2.4.0

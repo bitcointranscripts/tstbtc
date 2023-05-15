@@ -60,17 +60,6 @@ def test_download_video_file():
 
 
 @pytest.mark.main
-def test_split_video():
-    chapters = application.read_description("test/testAssets/")
-    application.split_mp4(chapters, "test/testAssets/test_video.mp4", "test/testAssets/test_video")
-    is_pass = True
-    for i in range(3):
-        is_pass = is_pass and os.path.isfile("test/testAssets/test_video - (" + str(i) + ").mp4")
-        os.remove("test/testAssets/test_video - (" + str(i) + ").mp4")
-    assert is_pass
-
-
-@pytest.mark.main
 def test_convert_video_to_audio():
     application.convert_video_to_mp3("test/testAssets/test_video.mp4")
     assert os.path.isfile("test/testAssets/test_video.mp3")

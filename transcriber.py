@@ -26,9 +26,9 @@ def print_help(ctx, param, value):
 @click.command()
 @click.argument('source', nargs=1)
 @click.argument('loc', nargs=1)
-@click.option('-m', '--model', type=click.Choice(['tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large-v2']), default='tiny.en',
-              help='Options for transcription model'
-              )
+@click.option('-m', '--model', type=click.Choice(
+    ['tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large-v2']), default='tiny.en',
+              help='Options for transcription model')
 @click.option('-t', '--title', type=str,
               help="Supply transcribed file title in 'quotes', title is mandatory in case of audio files")
 @click.option('-d', '--date', type=str, help="Supply the event date in format 'yyyy-mm-dd'")
@@ -44,6 +44,11 @@ def print_help(ctx, param, value):
 @click.option('-h', '--help', is_flag=True, callback=print_help, expose_value=False, is_eager=True,
               help="Show the application's help and exit.")
 @click.option('-p', '--PR', is_flag=True, default=False, help="Supply this flag if you want to generate a payload")
+@click.option('-D', '--deepgram', is_flag=True, default=False, help="Supply this flag if you want to use deepgram")
+@click.option('-S', '--summarize', is_flag=True, default=False,
+              help="Supply this flag if you want to summarize the content")
+@click.option('-M', '--diarize', is_flag=True, default=False, help="Supply this flag if you have multiple speakers AKA "
+                                                                   "want to diarize the content")
 def add(
         source: str,
         loc: str,
@@ -54,7 +59,10 @@ def add(
         speakers: str,
         category: str,
         chapters: bool,
-        pr: bool
+        pr: bool,
+        deepgram: bool,
+        summarize: bool,
+        diarize: bool
 ) -> None:
     """Supply a YouTube video id and directory for transcription. \n
        Note: The https links need to be wrapped in quotes when running the command on zsh
@@ -77,8 +85,9 @@ def add(
             return
         filename = application.process_source(source=source, title=title, event_date=event_date, tags=tags,
                                               category=category, speakers=speakers, loc=loc, model=model,
-                                              username=username, chapters=chapters, pr=pr,
-                                              source_type=source_type, created_files=created_files)
+                                              username=username, chapters=chapters, pr=pr, summarize=summarize,
+                                              source_type=source_type, created_files=created_files, deepgram=deepgram,
+                                              diarize=diarize)
         if filename:
             """ INITIALIZE GIT AND OPEN A PR"""
             print("Transcription complete")
