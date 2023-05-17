@@ -302,7 +302,8 @@ def process_mp3_deepgram(filename, summarize, diarize):
             source = {'buffer': audio, 'mimetype': mimeType}
             response = dg_client.transcription.sync_prerecorded(source, {'punctuate': True, 'speaker_labels': True,
                                                                          'diarize': diarize, 'smart_formatting': True,
-                                                                         'summarize': summarize})
+                                                                         'summarize': summarize,
+                                                                         'model': 'whisper-large'})
             audio.close()
         return response
     except Exception as e:
