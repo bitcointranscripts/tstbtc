@@ -2,6 +2,7 @@ import click
 from app import application
 from app import __version__, __app_name__
 from datetime import datetime
+import logging
 
 
 @click.group()
@@ -19,7 +20,7 @@ def print_version(ctx, param, value):
 def print_help(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
-    print(ctx.get_help())
+    logging.info(ctx.get_help())
     ctx.exit()
 
 
@@ -49,6 +50,7 @@ def print_help(ctx, param, value):
               help="Supply this flag if you want to summarize the content")
 @click.option('-M', '--diarize', is_flag=True, default=False, help="Supply this flag if you have multiple speakers AKA "
                                                                    "want to diarize the content")
+@click.option('-V', '--verbose', is_flag=True, default=False, help="Supply this flag to enable verbose logging")
 def add(
         source: str,
         loc: str,
@@ -62,11 +64,17 @@ def add(
         pr: bool,
         deepgram: bool,
         summarize: bool,
-        diarize: bool
+        diarize: bool,
+        verbose: bool
 ) -> None:
     """Supply a YouTube video id and directory for transcription. \n
        Note: The https links need to be wrapped in quotes when running the command on zsh
     """
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.WARNING)
+
     created_files = []
     try:
         username = application.get_username()
@@ -76,24 +84,24 @@ def add(
             try:
                 event_date = datetime.strptime(date, '%Y-%m-%d').date()
             except:
-                print("Supplied date is invalid")
+                logging.error("Supplied date is invalid")
                 return
 
         source_type = application.check_source_type(source=source)
         if source_type is None:
-            print("Invalid source")
+            logging.error("Invalid source")
             return
         filename = application.process_source(source=source, title=title, event_date=event_date, tags=tags,
                                               category=category, speakers=speakers, loc=loc, model=model,
                                               username=username, chapters=chapters, pr=pr, summarize=summarize,
                                               source_type=source_type, created_files=created_files, deepgram=deepgram,
-                                              diarize=diarize)
+                                              diarize=diarize, verbose=verbose)
         if filename:
             """ INITIALIZE GIT AND OPEN A PR"""
-            print("Transcription complete")
-        print("Cleaning up...")
+            logging.info("Transcription complete")
+        logging.info("Cleaning up...")
         application.clean_up(created_files)
     except Exception as e:
-        print(e)
-        print("Cleaning up...")
+        logging.error(e)
+        logging.error("Cleaning up...")
         application.clean_up(created_files)

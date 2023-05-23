@@ -8,7 +8,7 @@ from moviepy.editor import VideoFileClip
 import whisper
 import os
 import static_ffmpeg
-from app import __version__
+from app import __version__, __app_name__
 import requests
 import re
 from urllib.parse import urlparse, parse_qs
@@ -17,12 +17,14 @@ from dotenv import dotenv_values
 import yt_dlp
 from deepgram import Deepgram
 import mimetypes
+import logging
 
 
 def download_video(url):
+    logger = logging.getLogger(__app_name__)
     try:
-        print("URL: " + url)
-        print("Downloading video... Please wait.")
+        logger.info("URL: " + url)
+        logger.info("Downloading video... Please wait.")
 
         ydl_opts = {
             'format': '18',
@@ -42,18 +44,19 @@ def download_video(url):
 
         return os.path.abspath("tmp/" + name + '.mp4')
     except Exception as e:
-        print("Error downloading video")
+        logger.error("Error downloading video")
         shutil.rmtree('tmp')
         return
 
 
 def read_description(prefix):
+    logger = logging.getLogger(__app_name__)
     try:
         list_of_chapters = []
         with open(prefix + 'videoFile.info.json', 'r') as f:
             info = json.load(f)
         if 'chapters' not in info:
-            print("No chapters found in description")
+            logger.info("No chapters found in description")
             return list_of_chapters
         for index, x in enumerate(info['chapters']):
             name = x['title']
@@ -62,12 +65,13 @@ def read_description(prefix):
 
         return list_of_chapters
     except Exception as e:
-        print("Error reading description")
+        logger.error("Error reading description")
         return []
 
 
 def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
     # Write out the chapter file based on simple MP4 format (OGM)
+    logger = logging.getLogger(__app_name__)
     try:
         with open(chapter_file, 'w') as fo:
             for current_chapter in chapter_list:
@@ -77,20 +81,21 @@ def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
                          f'{current_chapter[2]}\n')
             fo.close()
     except Exception as e:
-        print("Error writing chapter file")
-        print(e)
+        logger.error("Error writing chapter file")
+        logger.error(e)
 
 
 def convert_video_to_mp3(filename):
+    logger = logging.getLogger(__app_name__)
     try:
         clip = VideoFileClip(filename)
-        print("Converting video to mp3... Please wait.")
-        print(filename[:-4] + ".mp3")
+        logger.info("Converting video to mp3... Please wait.")
+        logger.info(filename[:-4] + ".mp3")
         clip.audio.write_audiofile(filename[:-4] + ".mp3")
         clip.close()
-        print("Converted video to mp3")
+        logger.info("Converted video to mp3")
     except:
-        print("Error converting video to mp3")
+        logger.error("Error converting video to mp3")
         return None
     return filename
 
@@ -126,18 +131,20 @@ def check_if_video(media):
 
 
 def get_playlist_videos(url):
+    logger = logging.getLogger(__app_name__)
     try:
         videos = pytube.Playlist(url)
         return videos
     except Exception as e:
-        print("Error getting playlist videos")
-        print(e)
+        logger.error("Error getting playlist videos")
+        logger.error(e)
         return
 
 
 def get_audio_file(url, title):
-    print("URL: " + url)
-    print("downloading audio file")
+    logger = logging.getLogger(__app_name__)
+    logger.info("URL: " + url)
+    logger.info("downloading audio file")
     try:
         audio = requests.get(url, stream=True)
         with open("tmp/" + title + ".mp3", "wb") as f:
@@ -148,24 +155,25 @@ def get_audio_file(url, title):
                     f.flush()
         return title + ".mp3"
     except Exception as e:
-        print("Error downloading audio file")
-        print(e)
+        logger.error("Error downloading audio file")
+        logger.error(e)
         return
 
 
 def process_mp3(filename, model):
-    print("Transcribing audio to text using whisper ...")
+    logger = logging.getLogger(__app_name__)
+    logger.info("Transcribing audio to text using whisper ...")
     try:
         my_model = whisper.load_model(model)
         result = my_model.transcribe(filename)
         data = []
         for x in result["segments"]:
             data.append(tuple((x["start"], x["end"], x["text"])))
-        print("Removed video and audio files")
+        logger.info("Removed video and audio files")
         return data
     except Exception as e:
-        print("Error transcribing audio to text")
-        print(e)
+        logger.error("Error transcribing audio to text")
+        logger.error(e)
         return
 
 
@@ -178,6 +186,7 @@ def decimal_to_sexagesimal(dec):
 
 
 def combine_chapter(chapters, transcript):
+    logger = logging.getLogger(__app_name__)
     try:
         chapters_pointer = 0
         transcript_pointer = 0
@@ -202,11 +211,12 @@ def combine_chapter(chapters, transcript):
 
         return result
     except Exception as e:
-        print("Error combining chapters")
-        print(e)
+        logger.error("Error combining chapters")
+        logger.error(e)
 
 
 def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
+    logger = logging.getLogger(__app_name__)
     try:
         para = ""
         string = ""
@@ -252,11 +262,12 @@ def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
         string = string + para
         return string
     except Exception as e:
-        print("Error combining deepgram chapters")
-        print(e)
+        logger.error("Error combining deepgram chapters")
+        logger.error(e)
 
 
 def get_deepgram_transcript(deepgram_data, diarize):
+    logger = logging.getLogger(__app_name__)
     if diarize:
         para = ""
         string = ""
@@ -280,6 +291,7 @@ def get_deepgram_transcript(deepgram_data, diarize):
 
 
 def get_deepgram_summary(deepgram_data):
+    logger = logging.getLogger(__app_name__)
     try:
         summaries = deepgram_data["results"]["channels"][0]["alternatives"][0]["summaries"]
         summary = ""
@@ -287,12 +299,13 @@ def get_deepgram_summary(deepgram_data):
             summary = summary + " " + x["summary"]
         return summary.strip(" ")
     except Exception as e:
-        print("Error getting summary")
-        print(e)
+        logger.error("Error getting summary")
+        logger.error(e)
 
 
 def process_mp3_deepgram(filename, summarize, diarize):
-    print("Transcribing audio to text using deepgram...")
+    logger = logging.getLogger(__app_name__)
+    logger.info("Transcribing audio to text using deepgram...")
     try:
         config = dotenv_values(".env")
         dg_client = Deepgram(config["DEEPGRAM_API_KEY"])
@@ -307,8 +320,8 @@ def process_mp3_deepgram(filename, summarize, diarize):
             audio.close()
         return response
     except Exception as e:
-        print("Error transcribing audio to text")
-        print(e)
+        logger.error("Error transcribing audio to text")
+        logger.error(e)
         return
 
 
@@ -321,21 +334,23 @@ def create_transcript(data):
 
 
 def initialize():
+    logger = logging.getLogger(__app_name__)
     try:
-        print('''
+        logger.info('''
         This tool will convert Youtube videos to mp3 files and then transcribe them to text using Whisper.
         ''')
         # FFMPEG installed on first use.
-        print("Initializing FFMPEG...")
+        logger.debug("Initializing FFMPEG...")
         static_ffmpeg.add_paths()
-        print("Initialized FFMPEG")
+        logger.debug("Initialized FFMPEG")
     except Exception as e:
-        print("Error initializing")
-        print(e)
+        logger.error("Error initializing")
+        logger.error(e)
 
 
 def write_to_file(result, loc, url, title, date, tags, category, speakers, video_title, username, local, test, pr,
                   summary):
+    logger = logging.getLogger(__app_name__)
     try:
         transcribed_text = result
         if title:
@@ -387,33 +402,36 @@ def write_to_file(result, loc, url, title, date, tags, category, speakers, video
                              category=category, speakers=speakers, username=username, event_date=date, test=test)
         return file_name_with_ext
     except Exception as e:
-        print("Error writing to file")
-        print(e)
+        logger.error("Error writing to file")
+        logger.error(e)
 
 
 def get_md_file_path(result, loc, video, title, event_date, tags, category, speakers, username, local, video_title,
                      test, pr, summary=""):
+    logger = logging.getLogger(__app_name__)
     try:
-        print("writing .md file")
+        logger.info("writing .md file")
         file_name_with_ext = write_to_file(result, loc, video, title, event_date, tags, category, speakers, video_title,
                                            username, local, test, pr, summary)
-        print("wrote .md file")
+        logger.info("wrote .md file")
 
         absolute_path = os.path.abspath(file_name_with_ext)
         return absolute_path
     except Exception as e:
-        print("Error getting markdown file path")
-        print(e)
+        logger.error("Error getting markdown file path")
+        logger.error(e)
 
 
 def create_pr(absolute_path, loc, username, curr_time, title):
+    logger = logging.getLogger(__app_name__)
     branch_name = loc.replace("/", "-")
     subprocess.call(['bash', 'initializeRepo.sh', absolute_path, loc, branch_name, username, curr_time])
     subprocess.call(['bash', 'github.sh', branch_name, username, curr_time, title])
-    print("Please check the PR for the transcription.")
+    logger.info("Please check the PR for the transcription.")
 
 
 def get_username():
+    logger = logging.getLogger(__app_name__)
     try:
         if os.path.isfile(".username"):
             with open(".username", "r") as f:
@@ -427,8 +445,8 @@ def get_username():
                 f.close()
         return username
     except Exception as e:
-        print("Error getting username")
-        print(e)
+        logger.error("Error getting username")
+        logger.error(e)
 
 
 def check_source_type(source):
@@ -449,13 +467,14 @@ def check_source_type(source):
 
 def process_audio(source, title, event_date, tags, category, speakers, loc, model, username, local,
                   created_files, test, pr, deepgram, summarize, diarize):
+    logger = logging.getLogger(__app_name__)
     try:
-        print("audio file detected")
+        logger.info("audio file detected")
         curr_time = str(round(time.time() * 1000))
 
         # check if title is supplied if not, return None
         if title is None:
-            print("Error: Please supply a title for the audio file")
+            logger.error("Error: Please supply a title for the audio file")
             return None
         # process audio file
         summary = None
@@ -463,15 +482,15 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
         if not local:
             filename = get_audio_file(url=source, title=title)
             abs_path = os.path.abspath(path="tmp/" + filename)
-            print("filename", filename)
-            print("abs_path", abs_path)
+            logger.info("filename", filename)
+            logger.info("abs_path", abs_path)
             created_files.append(abs_path)
         else:
             filename = source.split("/")[-1]
             abs_path = source
-        print("processing audio file", abs_path)
+        logger.info("processing audio file", abs_path)
         if filename is None:
-            print("File not found")
+            logger.info("File not found")
             return
         if filename.endswith('wav'):
             initialize()
@@ -499,22 +518,23 @@ def process_audio(source, title, event_date, tags, category, speakers, loc, mode
             created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
-        print("Error processing audio file")
-        print(e)
+        logger.error("Error processing audio file")
+        logger.error(e)
 
 
 def process_videos(source, title, event_date, tags, category, speakers, loc, model, username, created_files,
                    chapters, pr, deepgram, summarize, diarize):
+    logger = logging.getLogger(__app_name__)
     try:
-        print("Playlist detected")
+        logger.info("Playlist detected")
         if source.startswith("http") or source.startswith("www"):
             parsed_url = urlparse(source)
             source = parse_qs(parsed_url.query)["list"][0]
         url = "https://www.youtube.com/playlist?list=" + source
-        print(url)
+        logger.info(url)
         videos = get_playlist_videos(url)
         if videos is None:
-            print("Playlist is empty")
+            logger.info("Playlist is empty")
             return
 
         selected_model = model + '.en'
@@ -529,11 +549,12 @@ def process_videos(source, title, event_date, tags, category, speakers, loc, mod
                 return None
         return filename
     except Exception as e:
-        print("Error processing playlist")
-        print(e)
+        logger.error("Error processing playlist")
+        logger.error(e)
 
 
 def combine_deepgram_with_chapters(deepgram_data, chapters):
+    logger = logging.getLogger(__app_name__)
     try:
         chapters_pointer = 0
         words_pointer = 0
@@ -559,12 +580,13 @@ def combine_deepgram_with_chapters(deepgram_data, chapters):
 
         return result
     except Exception as e:
-        print("Error combining deepgram with chapters")
-        print(e)
+        logger.error("Error combining deepgram with chapters")
+        logger.error(e)
 
 
 def process_video(video, title, event_date, tags, category, speakers, loc, model, username, created_files,
                   chapters, test, pr, local=False, deepgram=False, summarize=False, diarize=False):
+    logger = logging.getLogger(__app_name__)
     try:
         curr_time = str(round(time.time() * 1000))
         if not local:
@@ -574,18 +596,18 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
             elif "youtu.be" in video or "embed" in video:
                 video = video.split("/")[-1]
             video = "https://www.youtube.com/watch?v=" + video
-            print("Transcribing video: " + video)
+            logger.info("Transcribing video: " + video)
             if event_date is None:
                 event_date = get_date(video)
             abs_path = download_video(url=video)
             if abs_path is None:
-                print("File not found")
+                logger.info("File not found")
                 return None
             created_files.append(abs_path)
             filename = abs_path.split("/")[-1]
         else:
             filename = video.split("/")[-1]
-            print("Transcribing video: " + filename)
+            logger.info("Transcribing video: " + filename)
             abs_path = video
         print()
         print()
@@ -603,13 +625,13 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
             deepgram_data = process_mp3_deepgram(abs_path[:-4] + ".mp3", summarize=summarize, diarize=diarize)
             result = get_deepgram_transcript(deepgram_data=deepgram_data, diarize=diarize)
             if summarize:
-                print("Summarizing")
+                logger.info("Summarizing")
                 summary = get_deepgram_summary(deepgram_data=deepgram_data)
         if not deepgram:
             result = process_mp3(abs_path[:-4] + ".mp3", model)
         created_files.append(abs_path[:-4] + ".mp3")
         if chapters and len(chapters) > 0:
-            print("Chapters detected")
+            logger.info("Chapters detected")
             write_chapters_file(abs_path[:-4] + '.chapters', chapters)
             created_files.append(abs_path[:-4] + '.chapters')
             if deepgram:
@@ -629,7 +651,7 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 result = ""
         if not title:
             title = filename[:-4]
-        print("Creating markdown file")
+        logger.info("Creating markdown file")
         absolute_path = get_md_file_path(result=result, loc=loc, video=video, title=title, event_date=event_date,
                                          tags=tags, summary=summary, category=category, speakers=speakers,
                                          username=username, video_title=filename[:-4], local=local, pr=pr, test=test)
@@ -641,14 +663,31 @@ def process_video(video, title, event_date, tags, category, speakers, loc, model
                 created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
-        print("Error processing video")
-        print(e)
+        logger.error("Error processing video")
+        logger.error(e)
 
+
+def setup_logger():
+    logger = logging.getLogger(__app_name__)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(
+        logging.DEBUG)  # Set the desired log level for console output in the submodule
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 def process_source(source, title, event_date, tags, category, speakers, loc, model, username, source_type,
                    created_files, chapters, local=False, test=None, pr=False, deepgram=False, summarize=False,
-                   diarize=False):
+                   diarize=False, verbose=False):
+    setup_logger()
+    logger = logging.getLogger(__app_name__)
     try:
+        if verbose:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.WARNING)
+
         if not os.path.isdir("tmp"):
             os.mkdir("tmp")
         else:
@@ -682,8 +721,8 @@ def process_source(source, title, event_date, tags, category, speakers, loc, mod
                                      chapters=chapters, test=test, pr=pr, deepgram=deepgram)
         return filename
     except Exception as e:
-        print("Error processing source")
-        print(e)
+        logger.error("Error processing source")
+        logger.error(e)
 
 
 def get_date(url):
@@ -699,6 +738,7 @@ def clean_up(created_files):
 
 
 def generate_payload(loc, title, event_date, tags, category, speakers, username, media, transcript, test):
+    logger = logging.getLogger(__app_name__)
     try:
         event_date = event_date if event_date is None else event_date if type(
             event_date) is str else event_date.strftime('%Y-%m-%d')
@@ -721,7 +761,7 @@ def generate_payload(loc, title, event_date, tags, category, speakers, username,
             url = config['QUEUE_ENDPOINT'] + "/api/transcripts"
             resp = requests.post(url, json=content)
             if resp.status_code == 200:
-                print("Transcript added to queue")
+                logger.info("Transcript added to queue")
             return resp
     except Exception as e:
-        print(e)
+        logger.error(e)
