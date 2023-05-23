@@ -6,6 +6,12 @@ import pytest
 from app import application
 
 
+def rel_path(path):
+    return os.path.relpath(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), path))
+    )
+
+
 @pytest.mark.main
 def test_initialize_repo():
     try:
@@ -127,8 +133,8 @@ def test_download_video_file():
 
 @pytest.mark.main
 def test_convert_video_to_audio():
-    os.makedirs("tmp/")
-    path = application.convert_video_to_mp3("test/testAssets/test_video.mp4")
-    assert os.path.isfile(path)
-    os.remove(path)
-    os.removedirs("tmp/")
+    if not os.path.isdir("tmp/"):
+        os.makedirs("tmp/")
+    application.convert_video_to_mp3(rel_path("testAssets/test_video.mp4"))
+    assert os.path.isfile("tmp/test_video.mp3")
+    shutil.rmtree("tmp/")

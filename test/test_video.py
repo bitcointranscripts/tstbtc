@@ -8,6 +8,12 @@ import pytest
 from app import application
 
 
+def rel_path(path):
+    return os.path.relpath(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), path))
+    )
+
+
 def check_md_file(
     path,
     transcript_by,
@@ -84,10 +90,10 @@ def check_md_file(
 
 @pytest.mark.feature
 def test_video_with_title():
-    with open("test/testAssets/transcript.txt", "r") as file:
+    with open(rel_path("testAssets/transcript.txt"), "r") as file:
         result = file.read()
         file.close()
-    source = "test/testAssets/test_video.mp4"
+    source = os.path.abspath(rel_path("testAssets/test_video.mp4"))
     username = "username"
     title = "test_video"
     speakers = None
@@ -128,7 +134,7 @@ def test_video_with_title():
 
 @pytest.mark.feature
 def test_video_with_all_options():
-    source = "test/testAssets/test_video.mp4"
+    source = rel_path("testAssets/test_video.mp4")
     username = "username"
     title = "test_video"
     speakers = "speaker1,speaker2"
@@ -175,10 +181,10 @@ def test_video_with_all_options():
 
 @pytest.mark.feature
 def test_video_with_chapters():
-    with open("test/testAssets/transcript.txt", "r") as file:
+    with open(rel_path("testAssets/transcript.txt"), "r") as file:
         result = file.read()
         file.close()
-    source = "test/testAssets/test_video.mp4"
+    source = rel_path("testAssets/test_video.mp4")
     username = "username"
     title = "test_video"
     speakers = "speaker1,speaker2"
@@ -205,7 +211,7 @@ def test_video_with_chapters():
     assert tmp_dir is not None
     filename = os.path.join(tmp_dir, filename)
     chapter_names = []
-    with open("test/testAssets/test_video_chapters.chapters", "r") as file:
+    with open(rel_path("testAssets/test_video_chapters.chapters"), "r") as file:
         result = file.read()
         for x in result.split("\n"):
             if re.search(r"CHAPTER\d\dNAME", x):
@@ -237,11 +243,11 @@ def test_video_with_chapters():
 def test_generate_payload():
     date = "2020-01-31"
     date = datetime.strptime(date, "%Y-%m-%d").date()
-    with open("test/testAssets/transcript.txt", "r") as file:
+    with open(rel_path("testAssets/transcript.txt"), "r") as file:
         transcript = file.read()
         file.close()
     payload = application.generate_payload(
-        loc="yada/yada",
+        loc=rel_path("yada/yada"),
         title="test_title",
         event_date=date,
         tags="tag1, tag2",
@@ -249,10 +255,23 @@ def test_generate_payload():
         category="category1, category2",
         speakers="speaker1, speaker2",
         username="username",
-        media="test/testAssets/test_video.mp4",
+        media=rel_path("testAssets/test_video.mp4"),
         transcript=transcript,
     )
-    with open("test/testAssets/payload.json", "r") as outfile:
+    with open(rel_path("testAssets/payload.json"), "r") as outfile:
         content = json.load(outfile)
         outfile.close()
-    assert payload == content
+
+    # assert payload == content
+    assert list(content.keys()) == list(payload.keys())
+    for k in content.keys():
+        if k == "content":
+            for key in content[k].keys():
+                if key == "loc":
+                    assert payload[k][key][-9:] == content[k][key][-9:]
+                elif key == "media":
+                    assert payload[k][key][-25:] == content[k][key][-25:]
+                else:
+                    assert payload[k][key] == content[k][key]
+        else:
+            assert payload[k] == content[k]

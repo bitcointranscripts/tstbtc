@@ -6,6 +6,12 @@ import pytest
 from app import application
 
 
+def rel_path(path):
+    return os.path.relpath(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), path))
+    )
+
+
 def check_md_file(
     path,
     transcript_by,
@@ -55,10 +61,10 @@ def check_md_file(
 
 @pytest.mark.feature
 def test_audio_with_title():
-    with open("test/testAssets/transcript.txt", "r") as file:
+    with open(rel_path("testAssets/transcript.txt"), "r") as file:
         result = file.read()
         file.close()
-    source = "test/testAssets/audio.mp3"
+    source = rel_path("testAssets/audio.mp3")
     title = "title"
     username = "username"
     filename, tmp_dir = application.process_source(
@@ -68,7 +74,7 @@ def test_audio_with_title():
         tags=None,
         category=None,
         speakers=None,
-        loc="yada/yada",
+        loc=rel_path("yada/yada"),
         model="tiny",
         username=username,
         source_type="audio",
@@ -91,11 +97,11 @@ def test_audio_with_title():
 
 @pytest.mark.feature
 def test_audio_without_title():
-    with open("test/testAssets/transcript.txt", "r") as file:
+    with open(rel_path("testAssets/transcript.txt"), "r") as file:
         result = file.read()
         file.close()
 
-    source = "test/testAssets/audio.mp3"
+    source = rel_path("test/testAssets/audio.mp3")
     username = "username"
     title = None
     filename, tmp_dir = application.process_source(
@@ -105,7 +111,7 @@ def test_audio_without_title():
         tags=None,
         category=None,
         speakers=None,
-        loc="yada/yada",
+        loc=rel_path("yada/yada"),
         model="tiny",
         username=username,
         pr=False,
@@ -123,10 +129,10 @@ def test_audio_without_title():
 
 @pytest.mark.feature
 def test_audio_with_all_data():
-    with open("test/testAssets/transcript.txt", "r") as file:
+    with open(rel_path("testAssets/transcript.txt"), "r") as file:
         result = file.read()
         file.close()
-    source = "test/testAssets/audio.mp3"
+    source = rel_path("testAssets/audio.mp3")
     username = "username"
     title = "title"
     speakers = "speaker1,speaker2"
@@ -141,7 +147,7 @@ def test_audio_with_all_data():
         tags=tags,
         category=category,
         speakers=speakers,
-        loc="yada/yada",
+        loc=rel_path("yada/yada"),
         model="tiny",
         username=username,
         source_type="audio",
