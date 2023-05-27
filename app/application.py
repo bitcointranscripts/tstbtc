@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
+import boto3
 import pytube
 import requests
 import static_ffmpeg
@@ -199,7 +200,8 @@ def process_mp3(filename, model, model_output_dir):
         data = []
         for x in result["segments"]:
             data.append(tuple((x["start"], x["end"], x["text"])))
-        generate_srt(data, filename, model_output_dir)
+        data_path = generate_srt(data, filename, model_output_dir)
+        upload_file_to_s3(data_path)
         logger.info("Removed video and audio files")
         return data
     except Exception as e:
@@ -313,7 +315,8 @@ def get_deepgram_transcript(deepgram_data, diarize, title, model_output_dir):
         para = ""
         string = ""
         curr_speaker = None
-        save_local_json(deepgram_data, title, model_output_dir)
+        data_path = save_local_json(deepgram_data, title, model_output_dir)
+        upload_file_to_s3(data_path)
         for word in deepgram_data["results"]["channels"][0]["alternatives"][0][
             "words"
         ]:
@@ -334,7 +337,8 @@ def get_deepgram_transcript(deepgram_data, diarize, title, model_output_dir):
         string = string + para
         return string
     else:
-        save_local_json(deepgram_data, title, model_output_dir)
+        data_path = save_local_json(deepgram_data, title, model_output_dir)
+        upload_file_to_s3(data_path)
         return deepgram_data["results"]["channels"][0]["alternatives"][0][
             "transcript"
         ]
@@ -1123,6 +1127,20 @@ def format_time(time):
     seconds = int(time % 60)
     milliseconds = int((time % 1) * 1000)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+
+def upload_file_to_s3(file_path):
+    logger = logging.getLogger(__app_name__)
+    s3 = boto3.client("s3")
+    config = dotenv_values(".env")
+    bucket = config["S3_BUCKET"]
+    base_filename = file_path.split("/")[-1]
+    dir = "model outputs/" + base_filename
+    try:
+        s3.upload_file(file_path, bucket, dir)
+        logger.info(f"File uploaded to S3 bucket : {bucket}")
+    except Exception as e:
+        logger.error(f"Error uploading file to S3 bucket: {e}")
 
 
 def generate_payload(
