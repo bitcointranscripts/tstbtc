@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from urllib.parse import parse_qs, urlparse
 
@@ -23,7 +24,7 @@ from pytube.exceptions import PytubeError
 from app import __app_name__, __version__
 
 
-def download_video(url):
+def download_video(url, working_dir="tmp/"):
     logger = logging.getLogger(__app_name__)
     try:
         logger.info("URL: " + url)
@@ -31,24 +32,27 @@ def download_video(url):
 
         ydl_opts = {
             "format": "18",
-            "outtmpl": "tmp/videoFile.%(ext)s",
+            "outtmpl": os.path.join(working_dir, "videoFile.%(ext)s"),
             "nopart": True,
             "writeinfojson": True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ytdl:
             ytdl.download([url])
 
-        with open("tmp/videoFile.info.json") as file:
+        with open(os.path.join(working_dir, "videoFile.info.json")) as file:
             info = ytdl.sanitize_info(json.load(file))
             name = info["title"].replace("/", "-")
             file.close()
 
-        os.rename("tmp/videoFile.mp4", "tmp/" + name + ".mp4")
+        os.rename(
+            os.path.join(working_dir, "videoFile.mp4"),
+            os.path.join(working_dir, name + ".mp4"),
+        )
 
-        return os.path.abspath("tmp/" + name + ".mp4")
+        return os.path.abspath(os.path.join(working_dir, name + ".mp4"))
     except Exception as e:
         logger.error(f"Error downloading video: {e}")
-        shutil.rmtree("tmp")
+        shutil.rmtree(working_dir)
         return
 
 
@@ -90,24 +94,34 @@ def write_chapters_file(chapter_file: str, chapter_list: list) -> None:
         logger.error(e)
 
 
-def convert_video_to_mp3(filename):
+def convert_video_to_mp3(filename, working_dir="tmp/"):
     logger = logging.getLogger(__app_name__)
     try:
         clip = VideoFileClip(filename)
         logger.info("Converting video to mp3... Please wait.")
         logger.info(filename[:-4] + ".mp3")
-        clip.audio.write_audiofile(filename[:-4] + ".mp3")
+        clip.audio.write_audiofile(
+            os.path.join(working_dir, filename.split("/")[-1][:-4] + ".mp3")
+        )
         clip.close()
         logger.info("Converted video to mp3")
+        return os.path.join(working_dir, filename.split("/")[-1][:-4] + ".mp3")
     except Exception as e:
         logger.error(f"Error converting video to mp3: {e}")
         return None
-    return filename
 
 
-def convert_wav_to_mp3(abs_path, filename):
-    subprocess.call(["ffmpeg", "-i", abs_path, abs_path[:-4] + ".mp3"])
-    return filename[:-4] + ".mp3"
+def convert_wav_to_mp3(abs_path, filename, working_dir="tmp/"):
+    logger = logging.getLogger(__app_name__)
+    op = subprocess.run(
+        ["ffmpeg", "-i", abs_path, filename[:-4] + ".mp3"],
+        cwd=working_dir,
+        capture_output=True,
+        text=True,
+    )
+    logger.info(op.stdout)
+    logger.error(op.stderr)
+    return os.path.abspath(os.path.join(working_dir, filename[:-4] + ".mp3"))
 
 
 def check_if_playlist(media):
@@ -152,13 +166,13 @@ def get_playlist_videos(url):
         return
 
 
-def get_audio_file(url, title):
+def get_audio_file(url, title, working_dir="tmp/"):
     logger = logging.getLogger(__app_name__)
     logger.info("URL: " + url)
     logger.info("downloading audio file")
     try:
         audio = requests.get(url, stream=True)
-        with open("tmp/" + title + ".mp3", "wb") as f:
+        with open(os.path.join(working_dir, title + ".mp3"), "wb") as f:
             total_length = int(audio.headers.get("content-length"))
             for chunk in progress.bar(
                 audio.iter_content(chunk_size=1024),
@@ -199,7 +213,7 @@ def decimal_to_sexagesimal(dec):
     return f"{hrs:02d}:{minu:02d}:{sec:02d}"
 
 
-def combine_chapter(chapters, transcript):
+def combine_chapter(chapters, transcript, working_dir="tmp/"):
     logger = logging.getLogger(__app_name__)
     try:
         chapters_pointer = 0
@@ -227,7 +241,7 @@ def combine_chapter(chapters, transcript):
             result = result + transcript[transcript_pointer][2]
             transcript_pointer += 1
 
-        with open("result.md", "w") as file:
+        with open(os.path.join(working_dir, "result.md"), "w") as file:
             file.write(result)
 
         return result
@@ -409,6 +423,7 @@ def write_to_file(
     test,
     pr,
     summary,
+    working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
     try:
@@ -446,7 +461,7 @@ def write_to_file(
             meta_data += f"summary: {summary}\n"
 
         file_name = video_title.replace(" ", "-")
-        file_name_with_ext = "tmp/" + file_name + ".md"
+        file_name_with_ext = os.path.join(working_dir, file_name + ".md")
 
         if date:
             meta_data += f"date: {date}\n"
@@ -472,7 +487,7 @@ def write_to_file(
                 event_date=date,
                 test=test,
             )
-        return file_name_with_ext
+        return os.path.abspath(file_name_with_ext)
     except Exception as e:
         logger.error("Error writing to file")
         logger.error(e)
@@ -493,6 +508,7 @@ def get_md_file_path(
     test,
     pr,
     summary="",
+    working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
     try:
@@ -512,6 +528,7 @@ def get_md_file_path(
             test,
             pr,
             summary,
+            working_dir=working_dir,
         )
         logger.info("wrote .md file")
 
@@ -594,6 +611,7 @@ def process_audio(
     deepgram,
     summarize,
     diarize,
+    working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
     try:
@@ -608,22 +626,24 @@ def process_audio(
         summary = None
         result = None
         if not local:
-            filename = get_audio_file(url=source, title=title)
-            abs_path = os.path.abspath(path="tmp/" + filename)
+            filename = get_audio_file(
+                url=source, title=title, working_dir=working_dir
+            )
+            abs_path = os.path.abspath(path=os.path.join(working_dir, filename))
             logger.info("filename", filename)
             logger.info("abs_path", abs_path)
-            created_files.append(abs_path)
         else:
             filename = source.split("/")[-1]
-            abs_path = source
+            abs_path = os.path.abspath(source)
         logger.info("processing audio file", abs_path)
         if filename is None:
             logger.info("File not found")
             return
         if filename.endswith("wav"):
             initialize()
-            abs_path = convert_wav_to_mp3(abs_path=abs_path, filename=filename)
-            created_files.append(abs_path)
+            abs_path = convert_wav_to_mp3(
+                abs_path=abs_path, filename=filename, working_dir=working_dir
+            )
         if test:
             result = test
         else:
@@ -654,9 +674,9 @@ def process_audio(
             test=test,
             pr=pr,
             summary=summary,
+            working_dir=working_dir,
         )
 
-        created_files.append(absolute_path)
         if pr:
             create_pr(
                 absolute_path=absolute_path,
@@ -665,8 +685,6 @@ def process_audio(
                 curr_time=curr_time,
                 title=title,
             )
-        else:
-            created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
         logger.error("Error processing audio file")
@@ -689,6 +707,7 @@ def process_videos(
     deepgram,
     summarize,
     diarize,
+    working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
     try:
@@ -724,6 +743,7 @@ def process_videos(
                 diarize=diarize,
                 deepgram=deepgram,
                 summarize=summarize,
+                working_dir=working_dir,
             )
             if filename is None:
                 return None
@@ -786,6 +806,7 @@ def process_video(
     deepgram=False,
     summarize=False,
     diarize=False,
+    working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
     try:
@@ -800,31 +821,30 @@ def process_video(
             logger.info("Transcribing video: " + video)
             if event_date is None:
                 event_date = get_date(video)
-            abs_path = download_video(url=video)
+            abs_path = download_video(url=video, working_dir=working_dir)
             if abs_path is None:
                 logger.info("File not found")
                 return None
-            created_files.append(abs_path)
             filename = abs_path.split("/")[-1]
         else:
             filename = video.split("/")[-1]
             logger.info("Transcribing video: " + filename)
-            abs_path = video
-        print()
-        print()
+            abs_path = os.path.abspath(video)
 
         initialize()
         summary = None
         result = ""
         deepgram_data = None
         if chapters and not test:
-            chapters = read_description("tmp/")
+            chapters = read_description(working_dir)
         elif test:
             chapters = read_description("test/testAssets/")
-        convert_video_to_mp3(abs_path[:-4] + ".mp4")
+        mp3_path = convert_video_to_mp3(abs_path[:-4] + ".mp4", working_dir)
         if deepgram or summarize:
             deepgram_data = process_mp3_deepgram(
-                abs_path[:-4] + ".mp3", summarize=summarize, diarize=diarize
+                mp3_path,
+                summarize=summarize,
+                diarize=diarize,
             )
             result = get_deepgram_transcript(
                 deepgram_data=deepgram_data, diarize=diarize
@@ -833,12 +853,12 @@ def process_video(
                 logger.info("Summarizing")
                 summary = get_deepgram_summary(deepgram_data=deepgram_data)
         if not deepgram:
-            result = process_mp3(abs_path[:-4] + ".mp3", model)
-        created_files.append(abs_path[:-4] + ".mp3")
+            result = process_mp3(mp3_path, model)
         if chapters and len(chapters) > 0:
             logger.info("Chapters detected")
-            write_chapters_file(abs_path[:-4] + ".chapters", chapters)
-            created_files.append(abs_path[:-4] + ".chapters")
+            write_chapters_file(
+                os.path.join(working_dir, filename[:-4] + ".chapters"), chapters
+            )
             if deepgram:
                 if diarize:
                     result = combine_deepgram_chapters_with_diarization(
@@ -849,10 +869,11 @@ def process_video(
                         deepgram_data=deepgram_data, chapters=chapters
                     )
             else:
-                result = combine_chapter(chapters=chapters, transcript=result)
-            if not local:
-                created_files.append(abs_path)
-            created_files.append("tmp/" + filename[:-4] + ".chapters")
+                result = combine_chapter(
+                    chapters=chapters,
+                    transcript=result,
+                    working_dir=working_dir,
+                )
         else:
             if not test and not deepgram:
                 result = create_transcript(result)
@@ -876,8 +897,8 @@ def process_video(
             local=local,
             pr=pr,
             test=test,
+            working_dir=working_dir,
         )
-        created_files.append("tmp/" + filename[:-4] + ".description")
         if not test:
             if pr:
                 create_pr(
@@ -887,8 +908,6 @@ def process_video(
                     curr_time=curr_time,
                     title=title,
                 )
-            else:
-                created_files.append(absolute_path)
         return absolute_path
     except Exception as e:
         logger.error("Error processing video")
@@ -931,17 +950,13 @@ def process_source(
 ):
     setup_logger()
     logger = logging.getLogger(__app_name__)
+    tmp_dir = tempfile.mkdtemp()
+
     try:
         if verbose:
             logger.setLevel(logging.DEBUG)
         else:
             logger.setLevel(logging.WARNING)
-
-        if not os.path.isdir("tmp"):
-            os.mkdir("tmp")
-        else:
-            shutil.rmtree("tmp")
-            os.mkdir("tmp")
 
         if source_type == "audio":
             filename = process_audio(
@@ -961,6 +976,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                working_dir=tmp_dir,
             )
         elif source_type == "audio-local":
             filename = process_audio(
@@ -980,6 +996,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                working_dir=tmp_dir,
             )
         elif source_type == "playlist":
             filename = process_videos(
@@ -998,6 +1015,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                working_dir=tmp_dir,
             )
         elif source_type == "video-local":
             filename = process_video(
@@ -1018,6 +1036,7 @@ def process_source(
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
+                working_dir=tmp_dir,
             )
         else:
             filename = process_video(
@@ -1038,8 +1057,9 @@ def process_source(
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
+                working_dir=tmp_dir,
             )
-        return filename
+        return filename, tmp_dir
     except Exception as e:
         logger.error("Error processing source")
         logger.error(e)
@@ -1050,11 +1070,11 @@ def get_date(url):
     return str(video.publish_date).split(" ")[0]
 
 
-def clean_up(created_files):
+def clean_up(created_files, tmp_dir):
     for file in created_files:
         if os.path.isfile(file):
             os.remove(file)
-    shutil.rmtree("tmp")
+    shutil.rmtree(tmp_dir)
 
 
 def generate_payload(
