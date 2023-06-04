@@ -167,7 +167,6 @@ def add(
     else:
         logging.getLogger().setLevel(logging.WARNING)
 
-    created_files = []
     try:
         username = application.get_username()
         loc = loc.strip("/")
@@ -183,7 +182,7 @@ def add(
         if source_type is None:
             logging.error("Invalid source")
             return
-        filename = application.process_source(
+        filename, tmp_dir = application.process_source(
             source=source,
             title=title,
             event_date=event_date,
@@ -197,7 +196,6 @@ def add(
             pr=pr,
             summarize=summarize,
             source_type=source_type,
-            created_files=created_files,
             deepgram=deepgram,
             diarize=diarize,
             verbose=verbose,
@@ -206,8 +204,7 @@ def add(
             """INITIALIZE GIT AND OPEN A PR"""
             logging.info("Transcription complete")
         logging.info("Cleaning up...")
-        application.clean_up(created_files)
+        application.clean_up(tmp_dir)
     except Exception as e:
         logging.error(e)
         logging.error("Cleaning up...")
-        application.clean_up(created_files)

@@ -1,4 +1,5 @@
 """This module provides the transcript cli."""
+import errno
 import json
 import logging
 import mimetypes
@@ -605,7 +606,6 @@ def process_audio(
     model,
     username,
     local,
-    created_files,
     test,
     pr,
     deepgram,
@@ -701,7 +701,6 @@ def process_videos(
     loc,
     model,
     username,
-    created_files,
     chapters,
     pr,
     deepgram,
@@ -737,7 +736,6 @@ def process_videos(
                 model=selected_model,
                 username=username,
                 pr=pr,
-                created_files=created_files,
                 chapters=chapters,
                 test=False,
                 diarize=diarize,
@@ -798,7 +796,6 @@ def process_video(
     loc,
     model,
     username,
-    created_files,
     chapters,
     test,
     pr,
@@ -938,7 +935,6 @@ def process_source(
     model,
     username,
     source_type,
-    created_files,
     chapters,
     local=False,
     test=None,
@@ -971,7 +967,6 @@ def process_source(
                 username=username,
                 summarize=summarize,
                 local=local,
-                created_files=created_files,
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
@@ -991,7 +986,6 @@ def process_source(
                 username=username,
                 summarize=summarize,
                 local=True,
-                created_files=created_files,
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
@@ -1010,7 +1004,6 @@ def process_source(
                 model=model,
                 username=username,
                 summarize=summarize,
-                created_files=created_files,
                 chapters=chapters,
                 pr=pr,
                 deepgram=deepgram,
@@ -1029,7 +1022,6 @@ def process_source(
                 loc=loc,
                 model=model,
                 username=username,
-                created_files=created_files,
                 local=True,
                 diarize=diarize,
                 chapters=chapters,
@@ -1050,7 +1042,6 @@ def process_source(
                 loc=loc,
                 model=model,
                 username=username,
-                created_files=created_files,
                 local=local,
                 diarize=diarize,
                 chapters=chapters,
@@ -1070,11 +1061,12 @@ def get_date(url):
     return str(video.publish_date).split(" ")[0]
 
 
-def clean_up(created_files, tmp_dir):
-    for file in created_files:
-        if os.path.isfile(file):
-            os.remove(file)
-    shutil.rmtree(tmp_dir)
+def clean_up(tmp_dir):
+    try:
+        shutil.rmtree(tmp_dir)
+    except OSError as exc:
+        if exc.errno != errno.ENOENT:
+            raise
 
 
 def generate_payload(
