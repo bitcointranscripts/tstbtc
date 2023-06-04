@@ -142,6 +142,14 @@ def print_help(ctx, param, value):
     default=False,
     help="Supply this flag to enable verbose logging",
 )
+@click.option(
+    "-o",
+    "--model_output_dir",
+    type=str,
+    default="local_models/",
+    help="Supply this flag if you want to change the directory for saving "
+    "model outputs",
+)
 def add(
     source: str,
     loc: str,
@@ -157,6 +165,7 @@ def add(
     summarize: bool,
     diarize: bool,
     verbose: bool,
+    model_output_dir: str,
 ) -> None:
     """Supply a YouTube video id and directory for transcription. \n
     Note: The https links need to be wrapped in quotes when running the command
@@ -202,6 +211,7 @@ def add(
             source_type=source_type,
             deepgram=deepgram,
             diarize=diarize,
+            model_output_dir=model_output_dir,
             verbose=verbose,
         )
         if filename:

@@ -51,6 +51,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 bitcointranscripts
+local_models
 
 # Translations
 *.mo

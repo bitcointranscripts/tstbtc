@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 import pytube
@@ -309,11 +310,12 @@ def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
         logger.error(e)
 
 
-def get_deepgram_transcript(deepgram_data, diarize):
+def get_deepgram_transcript(deepgram_data, diarize, title, model_output_dir):
     if diarize:
         para = ""
         string = ""
         curr_speaker = None
+        save_local_json(deepgram_data, title, model_output_dir)
         for word in deepgram_data["results"]["channels"][0]["alternatives"][0][
             "words"
         ]:
@@ -334,6 +336,7 @@ def get_deepgram_transcript(deepgram_data, diarize):
         string = string + para
         return string
     else:
+        save_local_json(deepgram_data, title, model_output_dir)
         return deepgram_data["results"]["channels"][0]["alternatives"][0][
             "transcript"
         ]
@@ -605,6 +608,7 @@ def process_audio(
     deepgram,
     summarize,
     diarize,
+    model_output_dir="local_models/",
     working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
@@ -646,7 +650,10 @@ def process_audio(
                     filename=abs_path, summarize=summarize, diarize=diarize
                 )
                 result = get_deepgram_transcript(
-                    deepgram_data=deepgram_resp, diarize=diarize
+                    deepgram_data=deepgram_resp,
+                    diarize=diarize,
+                    title=title,
+                    model_output_dir=model_output_dir,
                 )
                 if summarize:
                     summary = get_deepgram_summary(deepgram_data=deepgram_resp)
@@ -700,6 +707,7 @@ def process_videos(
     deepgram,
     summarize,
     diarize,
+    model_output_dir="local_models",
     working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
@@ -736,6 +744,7 @@ def process_videos(
                 deepgram=deepgram,
                 summarize=summarize,
                 working_dir=working_dir,
+                model_output_dir=model_output_dir,
             )
             if filename is None:
                 return None
@@ -797,6 +806,7 @@ def process_video(
     deepgram=False,
     summarize=False,
     diarize=False,
+    model_output_dir="local_models",
     working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
@@ -822,6 +832,8 @@ def process_video(
             logger.info("Transcribing video: " + filename)
             abs_path = os.path.abspath(video)
 
+        if not title:
+            title = filename[:-4]
         initialize()
         summary = None
         result = ""
@@ -833,12 +845,13 @@ def process_video(
         mp3_path = convert_video_to_mp3(abs_path, working_dir)
         if deepgram or summarize:
             deepgram_data = process_mp3_deepgram(
-                mp3_path,
-                summarize=summarize,
-                diarize=diarize,
+                filename=mp3_path, summarize=summarize, diarize=diarize
             )
             result = get_deepgram_transcript(
-                deepgram_data=deepgram_data, diarize=diarize
+                deepgram_data=deepgram_data,
+                diarize=diarize,
+                title=title,
+                model_output_dir=model_output_dir,
             )
             if summarize:
                 logger.info("Summarizing")
@@ -870,8 +883,6 @@ def process_video(
                 result = create_transcript(result)
             elif not deepgram:
                 result = ""
-        if not title:
-            title = filename[:-4]
         logger.info("Creating markdown file")
         absolute_path = get_md_file_path(
             result=result,
@@ -936,11 +947,15 @@ def process_source(
     deepgram=False,
     summarize=False,
     diarize=False,
+    model_output_dir=None,
     verbose=False,
 ):
     setup_logger()
     logger = logging.getLogger(__app_name__)
     tmp_dir = tempfile.mkdtemp()
+    model_output_dir = (
+        "local_models/" if model_output_dir is None else model_output_dir
+    )
 
     try:
         if verbose:
@@ -965,6 +980,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         elif source_type == "audio-local":
@@ -984,6 +1000,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         elif source_type == "playlist":
@@ -1002,6 +1019,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         elif source_type == "video-local":
@@ -1022,6 +1040,7 @@ def process_source(
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         else:
@@ -1043,6 +1062,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 working_dir=tmp_dir,
+                model_output_dir=model_output_dir,
             )
         return filename, tmp_dir
     except Exception as e:
@@ -1061,6 +1081,21 @@ def clean_up(tmp_dir):
     except OSError as exc:
         if exc.errno != errno.ENOENT:
             raise
+
+
+def save_local_json(json_data, title, model_output_dir):
+    logger = logging.getLogger(__app_name__)
+    logger.info(f"Saving Locally...")
+    time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    if not os.path.isdir(model_output_dir):
+        os.makedirs(model_output_dir)
+    file_path = os.path.join(
+        model_output_dir, title + "_" + time_in_str + ".json"
+    )
+    with open(file_path, "w") as json_file:
+        json.dump(json_data, json_file, indent=4)
+    logger.info(f"Model stored at path {file_path}")
+    return file_path
 
 
 def generate_payload(
