@@ -61,7 +61,6 @@ def test_audio_with_title():
     source = "test/testAssets/audio.mp3"
     title = "title"
     username = "username"
-    created_files = []
     filename, tmp_dir = application.process_source(
         source=source,
         title=title,
@@ -77,7 +76,6 @@ def test_audio_with_title():
         test=result,
         chapters=False,
         pr=False,
-        created_files=created_files,
     )
     filename = os.path.join(tmp_dir, filename)
     assert os.path.isfile(filename)
@@ -88,7 +86,7 @@ def test_audio_with_title():
         title=title,
         local=True,
     )
-    application.clean_up(created_files, tmp_dir)
+    application.clean_up(tmp_dir)
 
 
 @pytest.mark.feature
@@ -99,7 +97,6 @@ def test_audio_without_title():
 
     source = "test/testAssets/audio.mp3"
     username = "username"
-    created_files = []
     title = None
     filename, tmp_dir = application.process_source(
         source=source,
@@ -114,7 +111,6 @@ def test_audio_without_title():
         pr=False,
         source_type="audio",
         local=True,
-        created_files=created_files,
         test=result,
         chapters=False,
     )
@@ -122,7 +118,7 @@ def test_audio_without_title():
     assert not check_md_file(
         path=filename, transcript_by=username, media=source, title=title
     )
-    application.clean_up(created_files, tmp_dir)
+    application.clean_up(tmp_dir)
 
 
 @pytest.mark.feature
@@ -138,7 +134,6 @@ def test_audio_with_all_data():
     category = "category"
     date = "2020-01-31"
     date = datetime.strptime(date, "%Y-%m-%d").date()
-    created_files = []
     filename, tmp_dir = application.process_source(
         source=source,
         title=title,
@@ -153,7 +148,6 @@ def test_audio_with_all_data():
         local=True,
         test=result,
         chapters=False,
-        created_files=created_files,
         pr=False,
     )
     category = [cat.strip() for cat in category.split(",")]
@@ -173,4 +167,4 @@ def test_audio_with_all_data():
         speakers=speakers,
         local=True,
     )
-    application.clean_up(created_files, tmp_dir)
+    application.clean_up(tmp_dir)
