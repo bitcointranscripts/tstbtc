@@ -190,7 +190,7 @@ def get_audio_file(url, title, working_dir="tmp/"):
         return
 
 
-def process_mp3(filename, model):
+def process_mp3(filename, model, model_output_dir):
     logger = logging.getLogger(__app_name__)
     logger.info("Transcribing audio to text using whisper ...")
     try:
@@ -199,6 +199,7 @@ def process_mp3(filename, model):
         data = []
         for x in result["segments"]:
             data.append(tuple((x["start"], x["end"], x["text"])))
+        generate_srt(data, filename, model_output_dir)
         logger.info("Removed video and audio files")
         return data
     except Exception as e:
@@ -242,9 +243,6 @@ def combine_chapter(chapters, transcript, working_dir="tmp/"):
         while transcript_pointer < len(transcript):
             result = result + transcript[transcript_pointer][2]
             transcript_pointer += 1
-
-        with open(os.path.join(working_dir, "result.md"), "w") as file:
-            file.write(result)
 
         return result
     except Exception as e:
@@ -658,7 +656,7 @@ def process_audio(
                 if summarize:
                     summary = get_deepgram_summary(deepgram_data=deepgram_resp)
             if not deepgram:
-                result = process_mp3(abs_path, model)
+                result = process_mp3(abs_path, model, model_output_dir)
                 result = create_transcript(result)
         absolute_path = get_md_file_path(
             result=result,
@@ -857,7 +855,7 @@ def process_video(
                 logger.info("Summarizing")
                 summary = get_deepgram_summary(deepgram_data=deepgram_data)
         if not deepgram:
-            result = process_mp3(mp3_path, model)
+            result = process_mp3(mp3_path, model, model_output_dir)
         if chapters and len(chapters) > 0:
             logger.info("Chapters detected")
             write_chapters_file(
@@ -1096,6 +1094,35 @@ def save_local_json(json_data, title, model_output_dir):
         json.dump(json_data, json_file, indent=4)
     logger.info(f"Model stored at path {file_path}")
     return file_path
+
+
+def generate_srt(data, filename, model_output_dir):
+    logger = logging.getLogger(__app_name__)
+    logger.info("Saving Locally...")
+    time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    base_filename, _ = os.path.splitext(filename)
+    if not os.path.isdir(model_output_dir):
+        os.makedirs(model_output_dir)
+    output_file = os.path.join(
+        model_output_dir, base_filename + "_" + time_in_str + ".srt"
+    )
+    logger.debug(f"writing srt to {output_file}")
+    with open(output_file, "w") as f:
+        for index, segment in enumerate(data):
+            start_time, end_time, text = segment
+            f.write(f"{index+1}\n")
+            f.write(f"{format_time(start_time)} --> {format_time(end_time)}\n")
+            f.write(f"{text.strip()}\n\n")
+    logger.info("File saved")
+    return output_file
+
+
+def format_time(time):
+    hours = int(time / 3600)
+    minutes = int((time % 3600) / 60)
+    seconds = int(time % 60)
+    milliseconds = int((time % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 
 def generate_payload(
