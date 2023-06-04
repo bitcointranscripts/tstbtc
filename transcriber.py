@@ -150,6 +150,14 @@ def print_help(ctx, param, value):
     help="Supply this flag if you want to change the directory for saving "
     "model outputs",
 )
+@click.option(
+    "-u",
+    "--upload",
+    is_flag=True,
+    default=False,
+    help="Supply this flag if you want to upload processed model files to AWS "
+    "S3",
+)
 def add(
     source: str,
     loc: str,
@@ -164,6 +172,7 @@ def add(
     deepgram: bool,
     summarize: bool,
     diarize: bool,
+    upload: bool,
     verbose: bool,
     model_output_dir: str,
 ) -> None:
@@ -211,6 +220,7 @@ def add(
             source_type=source_type,
             deepgram=deepgram,
             diarize=diarize,
+            upload=upload,
             model_output_dir=model_output_dir,
             verbose=verbose,
         )

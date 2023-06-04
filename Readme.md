@@ -26,7 +26,8 @@ The step-by-step flow for the scripts are:
 
   or
 
-- add the backend url to a `.env` file as `QUEUE_ENDPOINT`
+- add the backend url to a `.env` file as `QUEUE_ENDPOINT`. Optionally,
+  specify `S3_BUCKET` in `.env` for uploading model files.
 
 - send the transcript data to the backend queue
 
@@ -73,6 +74,8 @@ parameters:
   timestamps in the youtube video.
 - `-p` or `--pr`: Open a PR on the bitcointranscripts repo
 - `-m` or `model`: Supply optional whisper model
+- `-u` or `--upload`: Specify if you want to upload the generated model files in
+  AWS S3.
 
 #### Examples
 

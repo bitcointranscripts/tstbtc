@@ -191,7 +191,7 @@ def get_audio_file(url, title, working_dir="tmp/"):
         return
 
 
-def process_mp3(filename, model, model_output_dir):
+def process_mp3(filename, model, upload, model_output_dir):
     logger = logging.getLogger(__app_name__)
     logger.info("Transcribing audio to text using whisper ...")
     try:
@@ -201,8 +201,9 @@ def process_mp3(filename, model, model_output_dir):
         for x in result["segments"]:
             data.append(tuple((x["start"], x["end"], x["text"])))
         data_path = generate_srt(data, filename, model_output_dir)
-        upload_file_to_s3(data_path)
-        logger.info("Removed video and audio files")
+        if upload:
+            upload_file_to_s3(data_path)
+        logging.info("Removed video and audio files")
         return data
     except Exception as e:
         logger.error("Error transcribing audio to text")
@@ -310,13 +311,16 @@ def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
         logger.error(e)
 
 
-def get_deepgram_transcript(deepgram_data, diarize, title, model_output_dir):
+def get_deepgram_transcript(
+    deepgram_data, diarize, title, upload, model_output_dir
+):
     if diarize:
         para = ""
         string = ""
         curr_speaker = None
         data_path = save_local_json(deepgram_data, title, model_output_dir)
-        upload_file_to_s3(data_path)
+        if upload:
+            upload_file_to_s3(data_path)
         for word in deepgram_data["results"]["channels"][0]["alternatives"][0][
             "words"
         ]:
@@ -338,7 +342,8 @@ def get_deepgram_transcript(deepgram_data, diarize, title, model_output_dir):
         return string
     else:
         data_path = save_local_json(deepgram_data, title, model_output_dir)
-        upload_file_to_s3(data_path)
+        if upload:
+            upload_file_to_s3(data_path)
         return deepgram_data["results"]["channels"][0]["alternatives"][0][
             "transcript"
         ]
@@ -610,6 +615,7 @@ def process_audio(
     deepgram,
     summarize,
     diarize,
+    upload=False,
     model_output_dir="local_models/",
     working_dir="tmp/",
 ):
@@ -656,11 +662,12 @@ def process_audio(
                     diarize=diarize,
                     title=title,
                     model_output_dir=model_output_dir,
+                    upload=upload,
                 )
                 if summarize:
                     summary = get_deepgram_summary(deepgram_data=deepgram_resp)
             if not deepgram:
-                result = process_mp3(abs_path, model, model_output_dir)
+                result = process_mp3(abs_path, model, upload, model_output_dir)
                 result = create_transcript(result)
         absolute_path = get_md_file_path(
             result=result,
@@ -709,6 +716,7 @@ def process_videos(
     deepgram,
     summarize,
     diarize,
+    upload=False,
     model_output_dir="local_models",
     working_dir="tmp/",
 ):
@@ -745,6 +753,7 @@ def process_videos(
                 diarize=diarize,
                 deepgram=deepgram,
                 summarize=summarize,
+                upload=upload,
                 working_dir=working_dir,
                 model_output_dir=model_output_dir,
             )
@@ -808,6 +817,7 @@ def process_video(
     deepgram=False,
     summarize=False,
     diarize=False,
+    upload=False,
     model_output_dir="local_models",
     working_dir="tmp/",
 ):
@@ -854,12 +864,13 @@ def process_video(
                 diarize=diarize,
                 title=title,
                 model_output_dir=model_output_dir,
+                upload=upload,
             )
             if summarize:
                 logger.info("Summarizing")
                 summary = get_deepgram_summary(deepgram_data=deepgram_data)
         if not deepgram:
-            result = process_mp3(mp3_path, model, model_output_dir)
+            result = process_mp3(mp3_path, model, upload, model_output_dir)
         if chapters and len(chapters) > 0:
             logger.info("Chapters detected")
             write_chapters_file(
@@ -949,6 +960,7 @@ def process_source(
     deepgram=False,
     summarize=False,
     diarize=False,
+    upload=False,
     model_output_dir=None,
     verbose=False,
 ):
@@ -982,6 +994,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                upload=upload,
                 model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
@@ -1002,6 +1015,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                upload=upload,
                 model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
@@ -1021,6 +1035,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                upload=upload,
                 model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
@@ -1042,6 +1057,7 @@ def process_source(
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
+                upload=upload,
                 model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
@@ -1064,6 +1080,7 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 working_dir=tmp_dir,
+                upload=upload,
                 model_output_dir=model_output_dir,
             )
         return filename, tmp_dir
