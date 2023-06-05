@@ -1,1 +1,75 @@
-{"id": "cq5t_DxOGnY", "title": "Antoine Riard, Stretching Between Two Layers - Chaincode Residency Demo Day", "subtitles": {}, "chapters": [{"start_time": 0, "end_time": 5.0, "title": "<Untitled Chapter 1>"}, {"start_time": 5.0, "title": "Real world financial system", "end_time": 10.0}, {"start_time": 10.0, "title": "Rust-Lightning", "end_time": 15.0}], "like_count": 4, "channel": "Chaincode Labs", "channel_follower_count": 1830, "upload_date": "20190910", "availability": "public", "webpage_url_basename": "watch", "webpage_url_domain": "youtube.com", "extractor": "youtube", "extractor_key": "Youtube", "display_id": "cq5t_DxOGnY", "fulltitle": "Antoine Riard, Stretching Between Two Layers - Chaincode Residency Demo Day", "duration_string": "9:13", "is_live": false, "was_live": false, "asr": 44100, "format_id": "18", "format_note": "360p", "source_preference": -1, "fps": 30, "audio_channels": 2, "height": 360, "quality": 6.0, "has_drm": false, "tbr": 202.067, "url": "https://rr1---sn-o3o-qxa6.googlevideo.com/videoplayback?expire=1680055132&ei=_EYjZJGGNJOcvQTFgrqABw&ip=14.139.241.211&id=o-AF0cV3IfOxFzIlB0DTZ5KzqV7lF_FqwlzVy4EC8bwbBx&itag=18&source=youtube&requiressl=yes&mh=CD&mm=31%2C29&mn=sn-o3o-qxa6%2Csn-qxaelner&ms=au%2Crdu&mv=m&mvi=1&pl=24&initcwndbps=1176250&spc=99c5CU0vF4xTAoTWERbY1ZGL7nNnazM&vprv=1&svpuc=1&mime=video%2Fmp4&cnr=14&ratebypass=yes&dur=552.960&lmt=1637053946332209&mt=1680033184&fvip=3&fexp=24007246&c=ANDROID&txp=2218224&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=AOq0QJ8wRQIhANC7cwO3HcwGRK82StnEwy8EQcOJhaSfPsC3EIqaDv4_AiByD1sF5moS7SJmwTfKAFx8T-y4DO3A17Duf4PIRXj7gw%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgZRzh64dZo2BUfM98wKYCXkzTRRAF0C0Q-wmcnPgve9ACIQDMRY2vSjiGOXEkoSwNJCX1i8Hq4ipA3s4hJ3OGEfrhDg%3D%3D", "width": 640, "language_preference": -1, "ext": "mp4", "vcodec": "avc1.42001E", "acodec": "mp4a.40.2", "dynamic_range": "SDR", "protocol": "https", "resolution": "640x360", "aspect_ratio": 1.78, "filesize_approx": 14303110, "http_headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-us,en;q=0.5", "Sec-Fetch-Mode": "navigate"}, "video_ext": "mp4", "audio_ext": "none", "vbr": 202.067, "abr": 0.0, "format": "18 - 640x360 (360p)", "epoch": 1680033531, "_type": "video", "_version": {"version": "2023.03.04", "release_git_head": "392389b7df7b818f794b231f14dc396d4875fbad", "repository": "yt-dlp/yt-dlp"}}
+{
+  "id": "cq5t_DxOGnY",
+  "title": "Antoine Riard, Stretching Between Two Layers - Chaincode Residency Demo Day",
+  "subtitles": {},
+  "chapters": [
+    {
+      "start_time": 0,
+      "end_time": 5.0,
+      "title": "<Untitled Chapter 1>"
+    },
+    {
+      "start_time": 5.0,
+      "title": "Real world financial system",
+      "end_time": 10.0
+    },
+    {
+      "start_time": 10.0,
+      "title": "Rust-Lightning",
+      "end_time": 15.0
+    }
+  ],
+  "like_count": 4,
+  "channel": "Chaincode Labs",
+  "channel_follower_count": 1830,
+  "upload_date": "20190910",
+  "availability": "public",
+  "webpage_url_basename": "watch",
+  "webpage_url_domain": "youtube.com",
+  "extractor": "youtube",
+  "extractor_key": "Youtube",
+  "display_id": "cq5t_DxOGnY",
+  "fulltitle": "Antoine Riard, Stretching Between Two Layers - Chaincode Residency Demo Day",
+  "duration_string": "9:13",
+  "is_live": false,
+  "was_live": false,
+  "asr": 44100,
+  "format_id": "18",
+  "format_note": "360p",
+  "source_preference": -1,
+  "fps": 30,
+  "audio_channels": 2,
+  "height": 360,
+  "quality": 6.0,
+  "has_drm": false,
+  "tbr": 202.067,
+  "url": "https://rr1---sn-o3o-qxa6.googlevideo.com/videoplayback?expire=1680055132&ei=_EYjZJGGNJOcvQTFgrqABw&ip=14.139.241.211&id=o-AF0cV3IfOxFzIlB0DTZ5KzqV7lF_FqwlzVy4EC8bwbBx&itag=18&source=youtube&requiressl=yes&mh=CD&mm=31%2C29&mn=sn-o3o-qxa6%2Csn-qxaelner&ms=au%2Crdu&mv=m&mvi=1&pl=24&initcwndbps=1176250&spc=99c5CU0vF4xTAoTWERbY1ZGL7nNnazM&vprv=1&svpuc=1&mime=video%2Fmp4&cnr=14&ratebypass=yes&dur=552.960&lmt=1637053946332209&mt=1680033184&fvip=3&fexp=24007246&c=ANDROID&txp=2218224&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=AOq0QJ8wRQIhANC7cwO3HcwGRK82StnEwy8EQcOJhaSfPsC3EIqaDv4_AiByD1sF5moS7SJmwTfKAFx8T-y4DO3A17Duf4PIRXj7gw%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgZRzh64dZo2BUfM98wKYCXkzTRRAF0C0Q-wmcnPgve9ACIQDMRY2vSjiGOXEkoSwNJCX1i8Hq4ipA3s4hJ3OGEfrhDg%3D%3D",
+  "width": 640,
+  "language_preference": -1,
+  "ext": "mp4",
+  "vcodec": "avc1.42001E",
+  "acodec": "mp4a.40.2",
+  "dynamic_range": "SDR",
+  "protocol": "https",
+  "resolution": "640x360",
+  "aspect_ratio": 1.78,
+  "filesize_approx": 14303110,
+  "http_headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-us,en;q=0.5",
+    "Sec-Fetch-Mode": "navigate"
+  },
+  "video_ext": "mp4",
+  "audio_ext": "none",
+  "vbr": 202.067,
+  "abr": 0.0,
+  "format": "18 - 640x360 (360p)",
+  "epoch": 1680033531,
+  "_type": "video",
+  "_version": {
+    "version": "2023.03.04",
+    "release_git_head": "392389b7df7b818f794b231f14dc396d4875fbad",
+    "repository": "yt-dlp/yt-dlp"
+  }
+}
