@@ -115,8 +115,8 @@ def test_download_audio_file():
         "https://dcs.megaphone.fm/FPMN6776580946.mp3", "test"
     )
     print("audio", audio)
-    assert os.path.isfile("tmp/" + audio)
-    os.remove("tmp/" + audio)
+    assert os.path.isfile(audio)
+    os.remove(audio)
 
 
 def test_download_video_file():
