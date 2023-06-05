@@ -394,12 +394,6 @@ def create_transcript(data):
 def initialize():
     logger = logging.getLogger(__app_name__)
     try:
-        logger.info(
-            """
-        This tool will convert Youtube videos to mp3 files and then transcribe\
-         them to text using Whisper.
-        """
-        )
         # FFMPEG installed on first use.
         logger.debug("Initializing FFMPEG...")
         static_ffmpeg.add_paths()
