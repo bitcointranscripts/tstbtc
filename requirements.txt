@@ -1,5 +1,5 @@
 openai-whisper==20230314
-Click==7.0
+Click==8.1.3
 clint==0.5.1
 moviepy==1.0.3
 pytest==7.2.1
@@ -10,3 +10,6 @@ setuptools==45.2.0
 static_ffmpeg==2.3
 yt_dlp==2023.3.4
 deepgram-sdk==2.4.0
+black==23.3.0
+flake8==6.0.0
+isort==5.12.0

@@ -1,0 +1,15 @@
+[flake8]
+exclude =
+    .env
+    venv
+    .git
+    .github
+    .idea
+    build
+    app
+    tstbtc.egg-info
+    __pycache__
+    .venv
+    *.egg-info/
+    */migrations
+max-line-length = 80
