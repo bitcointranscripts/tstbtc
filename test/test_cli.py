@@ -14,13 +14,13 @@ def test_initialize_repo():
 
 @pytest.mark.feature
 def test_find_source_type():
-    video = application.check_source_type("B0HW_sJ503Y") == "video"
-    video1 = application.check_source_type("https://www.youtube.com/watch?v=B0HW_sJ503Y") == "video"
-    video2 = application.check_source_type("https://youtu.be/B0HW_sJ503Y") == "video"
-    video3 = application.check_source_type("https://youtube.com/embed/B0HW_sJ503Y") == "video"
-    video4 = application.check_source_type("youtube.com/watch?v=B0HW_sJ503Y") == "video"
-    video5 = application.check_source_type("www.youtube.com/watch?v=B0HW_sJ503Y&list") == "video"
-    video6 = application.check_source_type("https://youtube.com/watch?v=B0HW_sJ503Y") == "video"
+    video = application.check_source_type("D2lZxl53TLY") == "video"
+    video1 = application.check_source_type("https://www.youtube.com/watch?v=D2lZxl53TLY") == "video"
+    video2 = application.check_source_type("https://youtu.be/D2lZxl53TLY") == "video"
+    video3 = application.check_source_type("https://youtube.com/embed/D2lZxl53TLY") == "video"
+    video4 = application.check_source_type("youtube.com/watch?v=D2lZxl53TLY") == "video"
+    video5 = application.check_source_type("www.youtube.com/watch?v=D2lZxl53TLY&list") == "video"
+    video6 = application.check_source_type("https://youtube.com/watch?v=D2lZxl53TLY") == "video"
 
     playlist = application.check_source_type("PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
     playlist1 = application.check_source_type(
@@ -29,7 +29,7 @@ def test_find_source_type():
         "www.youtube.com/playlist?list=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
     playlist3 = application.check_source_type(
         "https://youtube.com/playlist?list=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
-    playlist4 = application.check_source_type("https://www.youtube.com/watch?v=B0HW_sJ503Y&list"
+    playlist4 = application.check_source_type("https://www.youtube.com/watch?v=D2lZxl53TLY&list"
                                               "=PLPQwGV1aLnTuN6kdNWlElfr2tzigB9Nnj") == "playlist"
     audio = application.check_source_type(
         "https://anchor.fm/s/12fe0620/podcast/play/32260353/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging"
@@ -50,7 +50,7 @@ def test_download_audio_file():
 def test_download_video_file():
     if not os.path.isdir('tmp'):
         os.mkdir('tmp')
-    url = "https://www.youtube.com/watch?v=B0HW_sJ503Y"
+    url = "https://www.youtube.com/watch?v=D2lZxl53TLY"
     video = application.download_video(url)
     assert os.path.isfile(video) and os.path.isfile('tmp/videoFile.info.json')
     print()
