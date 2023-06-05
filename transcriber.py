@@ -167,6 +167,10 @@ def add(
     else:
         logging.getLogger().setLevel(logging.WARNING)
 
+    logging.info(
+        " This tool will convert Youtube videos to mp3 files and then "
+        "transcribe them to text using Whisper. "
+    )
     try:
         username = application.get_username()
         loc = loc.strip("/")
