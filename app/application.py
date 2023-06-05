@@ -182,7 +182,7 @@ def get_audio_file(url, title, working_dir="tmp/"):
                 if chunk:
                     f.write(chunk)
                     f.flush()
-        return title + ".mp3"
+        return os.path.join(working_dir, title + ".mp3")
     except Exception as e:
         logger.error("Error downloading audio file")
         logger.error(e)
@@ -629,7 +629,7 @@ def process_audio(
             filename = get_audio_file(
                 url=source, title=title, working_dir=working_dir
             )
-            abs_path = os.path.abspath(path=os.path.join(working_dir, filename))
+            abs_path = os.path.abspath(path=filename)
             logger.info("filename", filename)
             logger.info("abs_path", abs_path)
         else:
@@ -836,7 +836,7 @@ def process_video(
             chapters = read_description(working_dir)
         elif test:
             chapters = read_description("test/testAssets/")
-        mp3_path = convert_video_to_mp3(abs_path[:-4] + ".mp4", working_dir)
+        mp3_path = convert_video_to_mp3(abs_path, working_dir)
         if deepgram or summarize:
             deepgram_data = process_mp3_deepgram(
                 mp3_path,
