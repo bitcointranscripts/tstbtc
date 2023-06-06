@@ -1184,9 +1184,9 @@ def generate_payload(
         data = {
             "title": title,
             "transcript_by": f"{username} via TBTBTC v{__version__}",
-            "categories": str(category),
-            "tags": str(tags),
-            "speakers": str(speakers),
+            "categories": category,
+            "tags": tags,
+            "speakers": speakers,
             "date": event_date,
             "media": media,
             "loc": loc,
