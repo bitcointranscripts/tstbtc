@@ -2,9 +2,9 @@
   "content": {
     "title": "test_title",
     "transcript_by": "username via TBTBTC v1.0.0",
-    "categories": "category1, category2",
-    "tags": "tag1, tag2",
-    "speakers": "speaker1, speaker2",
+    "categories": ["category1", "category2"],
+    "tags": ["tag1", "tag2"],
+    "speakers": ["speaker1", "speaker2"],
     "date": "2020-01-31",
     "media": "test/testAssets/test_video.mp4",
     "loc": "yada/yada",
