@@ -9,8 +9,10 @@ import shutil
 import subprocess
 import tempfile
 import time
+from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
+import boto3
 import pytube
 import requests
 import static_ffmpeg
@@ -189,7 +191,7 @@ def get_audio_file(url, title, working_dir="tmp/"):
         return
 
 
-def process_mp3(filename, model):
+def process_mp3(filename, model, upload, model_output_dir):
     logger = logging.getLogger(__app_name__)
     logger.info("Transcribing audio to text using whisper ...")
     try:
@@ -198,7 +200,10 @@ def process_mp3(filename, model):
         data = []
         for x in result["segments"]:
             data.append(tuple((x["start"], x["end"], x["text"])))
-        logger.info("Removed video and audio files")
+        data_path = generate_srt(data, filename, model_output_dir)
+        if upload:
+            upload_file_to_s3(data_path)
+        logging.info("Removed video and audio files")
         return data
     except Exception as e:
         logger.error("Error transcribing audio to text")
@@ -241,9 +246,6 @@ def combine_chapter(chapters, transcript, working_dir="tmp/"):
         while transcript_pointer < len(transcript):
             result = result + transcript[transcript_pointer][2]
             transcript_pointer += 1
-
-        with open(os.path.join(working_dir, "result.md"), "w") as file:
-            file.write(result)
 
         return result
     except Exception as e:
@@ -309,11 +311,16 @@ def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
         logger.error(e)
 
 
-def get_deepgram_transcript(deepgram_data, diarize):
+def get_deepgram_transcript(
+    deepgram_data, diarize, title, upload, model_output_dir
+):
     if diarize:
         para = ""
         string = ""
         curr_speaker = None
+        data_path = save_local_json(deepgram_data, title, model_output_dir)
+        if upload:
+            upload_file_to_s3(data_path)
         for word in deepgram_data["results"]["channels"][0]["alternatives"][0][
             "words"
         ]:
@@ -334,6 +341,9 @@ def get_deepgram_transcript(deepgram_data, diarize):
         string = string + para
         return string
     else:
+        data_path = save_local_json(deepgram_data, title, model_output_dir)
+        if upload:
+            upload_file_to_s3(data_path)
         return deepgram_data["results"]["channels"][0]["alternatives"][0][
             "transcript"
         ]
@@ -605,6 +615,8 @@ def process_audio(
     deepgram,
     summarize,
     diarize,
+    upload=False,
+    model_output_dir="local_models/",
     working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
@@ -646,12 +658,16 @@ def process_audio(
                     filename=abs_path, summarize=summarize, diarize=diarize
                 )
                 result = get_deepgram_transcript(
-                    deepgram_data=deepgram_resp, diarize=diarize
+                    deepgram_data=deepgram_resp,
+                    diarize=diarize,
+                    title=title,
+                    model_output_dir=model_output_dir,
+                    upload=upload,
                 )
                 if summarize:
                     summary = get_deepgram_summary(deepgram_data=deepgram_resp)
             if not deepgram:
-                result = process_mp3(abs_path, model)
+                result = process_mp3(abs_path, model, upload, model_output_dir)
                 result = create_transcript(result)
         absolute_path = get_md_file_path(
             result=result,
@@ -700,6 +716,8 @@ def process_videos(
     deepgram,
     summarize,
     diarize,
+    upload=False,
+    model_output_dir="local_models",
     working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
@@ -735,7 +753,9 @@ def process_videos(
                 diarize=diarize,
                 deepgram=deepgram,
                 summarize=summarize,
+                upload=upload,
                 working_dir=working_dir,
+                model_output_dir=model_output_dir,
             )
             if filename is None:
                 return None
@@ -797,6 +817,8 @@ def process_video(
     deepgram=False,
     summarize=False,
     diarize=False,
+    upload=False,
+    model_output_dir="local_models",
     working_dir="tmp/",
 ):
     logger = logging.getLogger(__app_name__)
@@ -822,6 +844,8 @@ def process_video(
             logger.info("Transcribing video: " + filename)
             abs_path = os.path.abspath(video)
 
+        if not title:
+            title = filename[:-4]
         initialize()
         summary = None
         result = ""
@@ -833,18 +857,20 @@ def process_video(
         mp3_path = convert_video_to_mp3(abs_path, working_dir)
         if deepgram or summarize:
             deepgram_data = process_mp3_deepgram(
-                mp3_path,
-                summarize=summarize,
-                diarize=diarize,
+                filename=mp3_path, summarize=summarize, diarize=diarize
             )
             result = get_deepgram_transcript(
-                deepgram_data=deepgram_data, diarize=diarize
+                deepgram_data=deepgram_data,
+                diarize=diarize,
+                title=title,
+                model_output_dir=model_output_dir,
+                upload=upload,
             )
             if summarize:
                 logger.info("Summarizing")
                 summary = get_deepgram_summary(deepgram_data=deepgram_data)
         if not deepgram:
-            result = process_mp3(mp3_path, model)
+            result = process_mp3(mp3_path, model, upload, model_output_dir)
         if chapters and len(chapters) > 0:
             logger.info("Chapters detected")
             write_chapters_file(
@@ -870,8 +896,6 @@ def process_video(
                 result = create_transcript(result)
             elif not deepgram:
                 result = ""
-        if not title:
-            title = filename[:-4]
         logger.info("Creating markdown file")
         absolute_path = get_md_file_path(
             result=result,
@@ -936,11 +960,16 @@ def process_source(
     deepgram=False,
     summarize=False,
     diarize=False,
+    upload=False,
+    model_output_dir=None,
     verbose=False,
 ):
     setup_logger()
     logger = logging.getLogger(__app_name__)
     tmp_dir = tempfile.mkdtemp()
+    model_output_dir = (
+        "local_models/" if model_output_dir is None else model_output_dir
+    )
 
     try:
         if verbose:
@@ -965,6 +994,8 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                upload=upload,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         elif source_type == "audio-local":
@@ -984,6 +1015,8 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                upload=upload,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         elif source_type == "playlist":
@@ -1002,6 +1035,8 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 diarize=diarize,
+                upload=upload,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         elif source_type == "video-local":
@@ -1022,6 +1057,8 @@ def process_source(
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
+                upload=upload,
+                model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
         else:
@@ -1043,6 +1080,8 @@ def process_source(
                 pr=pr,
                 deepgram=deepgram,
                 working_dir=tmp_dir,
+                upload=upload,
+                model_output_dir=model_output_dir,
             )
         return filename, tmp_dir
     except Exception as e:
@@ -1061,6 +1100,64 @@ def clean_up(tmp_dir):
     except OSError as exc:
         if exc.errno != errno.ENOENT:
             raise
+
+
+def save_local_json(json_data, title, model_output_dir):
+    logger = logging.getLogger(__app_name__)
+    logger.info(f"Saving Locally...")
+    time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    if not os.path.isdir(model_output_dir):
+        os.makedirs(model_output_dir)
+    file_path = os.path.join(
+        model_output_dir, title + "_" + time_in_str + ".json"
+    )
+    with open(file_path, "w") as json_file:
+        json.dump(json_data, json_file, indent=4)
+    logger.info(f"Model stored at path {file_path}")
+    return file_path
+
+
+def generate_srt(data, filename, model_output_dir):
+    logger = logging.getLogger(__app_name__)
+    logger.info("Saving Locally...")
+    time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    base_filename, _ = os.path.splitext(filename)
+    if not os.path.isdir(model_output_dir):
+        os.makedirs(model_output_dir)
+    output_file = os.path.join(
+        model_output_dir, base_filename + "_" + time_in_str + ".srt"
+    )
+    logger.debug(f"writing srt to {output_file}")
+    with open(output_file, "w") as f:
+        for index, segment in enumerate(data):
+            start_time, end_time, text = segment
+            f.write(f"{index+1}\n")
+            f.write(f"{format_time(start_time)} --> {format_time(end_time)}\n")
+            f.write(f"{text.strip()}\n\n")
+    logger.info("File saved")
+    return output_file
+
+
+def format_time(time):
+    hours = int(time / 3600)
+    minutes = int((time % 3600) / 60)
+    seconds = int(time % 60)
+    milliseconds = int((time % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+
+def upload_file_to_s3(file_path):
+    logger = logging.getLogger(__app_name__)
+    s3 = boto3.client("s3")
+    config = dotenv_values(".env")
+    bucket = config["S3_BUCKET"]
+    base_filename = file_path.split("/")[-1]
+    dir = "model outputs/" + base_filename
+    try:
+        s3.upload_file(file_path, bucket, dir)
+        logger.info(f"File uploaded to S3 bucket : {bucket}")
+    except Exception as e:
+        logger.error(f"Error uploading file to S3 bucket: {e}")
 
 
 def generate_payload(
