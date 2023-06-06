@@ -129,6 +129,14 @@ To run the full test suite
     - copy the generated one-time pass-code and paste in the browser to
       authenticate if you have enabled 2FA
 
+- To enable pushing the models to a S3 bucket,
+    - [Install](https://aws.amazon.com/cli/) aws-cli to your system.
+    - [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
+      aws-cli by first generating IAM credentials (if not already present) and
+      using `aws configure` to set them.
+    - To verify proper configuration, run `aws s3 ls` to show the list of S3
+      buckets. Set a valid bucket in the `.env` file.
+
 - Install `FFmpeg`
 
     - for Mac Os users, run `brew install ffmpeg`
