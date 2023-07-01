@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 from datetime import datetime
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import boto3
 import pytube
@@ -624,6 +624,19 @@ def process_audio(
         logger.info("audio file detected")
         curr_time = str(round(time.time() * 1000))
 
+        if not deepgram and diarize and not local:
+            send_to_pipeline(
+                source,
+                loc,
+                username,
+                title,
+                category,
+                tags,
+                speakers,
+                event_date,
+            )
+            return ""  # No absolute path to be returned
+
         # check if title is supplied if not, return None
         if title is None:
             logger.error("Error: Please supply a title for the audio file")
@@ -653,7 +666,25 @@ def process_audio(
         if test:
             result = test
         else:
-            if deepgram or summarize:
+            if not deepgram and diarize:
+                assert not local
+                key = upload_file_to_s3(abs_path)
+                logger.debug(f"mp3 file uploaded to {key} in AWS bucket")
+                source = get_s3_file_url(key)
+                logger.info(f"URL for uploaded mp3 file: {source}")
+
+                send_to_pipeline(
+                    source,
+                    loc,
+                    username,
+                    title,
+                    category,
+                    tags,
+                    speakers,
+                    event_date,
+                )
+                return ""  # No absolute path to be returned
+            elif deepgram or summarize:
                 deepgram_resp = process_mp3_deepgram(
                     filename=abs_path, summarize=summarize, diarize=diarize
                 )
@@ -800,6 +831,39 @@ def combine_deepgram_with_chapters(deepgram_data, chapters):
         logger.error(e)
 
 
+def send_to_pipeline(
+    source, loc, username, title, category, tags, speakers, event_date
+):
+    logger = logging.getLogger(__app_name__)
+    try:
+        event_date = (
+            event_date
+            if event_date is None
+            else event_date
+            if type(event_date) is str
+            else event_date.strftime("%Y-%m-%d")
+        )
+        data = {
+            "title": title,
+            "transcript_by": f"{username} via TBTBTC v{__version__}",
+            "categories": category,
+            "tags": tags,
+            "speakers": speakers,
+            "date": event_date,
+            "media": source,
+            "loc": loc,
+        }
+        config = dotenv_values(".env")
+        url = config["AWS_ENDPOINT"]
+        resp = requests.get(url, params=data)
+        if resp.status_code == 200:
+            logger.info("Uploaded to AWS pipeline for transcription")
+            print("Uploaded to AWS pipeline for transcription")
+        return resp
+    except Exception as e:
+        logger.error(f"Error while sending payload to pipeline: {e}")
+
+
 def process_video(
     video,
     title,
@@ -855,6 +919,25 @@ def process_video(
         elif test:
             chapters = read_description("test/testAssets/")
         mp3_path = convert_video_to_mp3(abs_path, working_dir)
+
+        if not deepgram and diarize:
+            key = upload_file_to_s3(mp3_path)
+            logger.debug(f"mp3 file uploaded to {key} in AWS bucket")
+            video = get_s3_file_url(key)
+            logger.info(f"URL for uploaded mp3 file: {video}")
+
+            send_to_pipeline(
+                video,
+                loc,
+                username,
+                title,
+                category,
+                tags,
+                speakers,
+                event_date,
+            )
+            return ""  # No absolute path to be returned
+
         if deepgram or summarize:
             deepgram_data = process_mp3_deepgram(
                 filename=mp3_path, summarize=summarize, diarize=diarize
@@ -1146,6 +1229,22 @@ def format_time(time):
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 
+def get_s3_file_url(key):
+    logger = logging.getLogger(__app_name__)
+    config = dotenv_values(".env")
+    bucket = config["S3_BUCKET"]
+    s3_client = boto3.client("s3")
+    try:
+        url = s3_client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": bucket, "Key": key},
+        )
+        logger.info(f"URL for uploaded file: {url}")
+        return url
+    except Exception as e:
+        logger.error(f"Error while retrieving file url: {e}")
+
+
 def upload_file_to_s3(file_path):
     logger = logging.getLogger(__app_name__)
     s3 = boto3.client("s3")
@@ -1158,6 +1257,7 @@ def upload_file_to_s3(file_path):
         logger.info(f"File uploaded to S3 bucket : {bucket}")
     except Exception as e:
         logger.error(f"Error uploading file to S3 bucket: {e}")
+    return dir
 
 
 def generate_payload(
