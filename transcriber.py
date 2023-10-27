@@ -6,6 +6,19 @@ import click
 from app import __app_name__, __version__, application
 
 
+def setup_logger():
+    logger = logging.getLogger(__app_name__)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(
+        logging.DEBUG
+    )  # Set the desired log level for console output in the submodule
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+
 @click.group()
 def cli():
     pass
@@ -180,13 +193,15 @@ def add(
     Note: The https links need to be wrapped in quotes when running the command
     on zsh
     """
+    setup_logger()
+    logger = logging.getLogger(__app_name__)
     if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
     else:
-        logging.getLogger().setLevel(logging.WARNING)
+        logger.setLevel(logging.WARNING)
 
-    logging.info(
-        " This tool will convert Youtube videos to mp3 files and then "
+    logger.info(
+        "This tool will convert Youtube videos to mp3 files and then "
         "transcribe them to text using Whisper. "
     )
     try:
@@ -197,12 +212,12 @@ def add(
             try:
                 event_date = datetime.strptime(date, "%Y-%m-%d").date()
             except ValueError as e:
-                logging.error("Supplied date is invalid: ", e)
+                logger.error("Supplied date is invalid: ", e)
                 return
 
         source_type = application.check_source_type(source=source)
         if source_type is None:
-            logging.error("Invalid source")
+            logger.error("Invalid source")
             return
         filename, tmp_dir = application.process_source(
             source=source,
@@ -226,9 +241,9 @@ def add(
         )
         if filename:
             """INITIALIZE GIT AND OPEN A PR"""
-            logging.info("Transcription complete")
-        logging.info("Cleaning up...")
+            logger.info("Transcription complete")
+        logger.info("Cleaning up...")
         application.clean_up(tmp_dir)
     except Exception as e:
-        logging.error(e)
-        logging.error("Cleaning up...")
+        logger.error(e)
+        logger.error("Cleaning up...")
