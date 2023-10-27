@@ -1,12 +1,14 @@
 # TRANSCRIBER TO BITCOIN TRANSCRIPT
 
-This project converts YouTube videos to bitcoinscripts and opens a PR
-on [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts)
-repo. It uses `youwhisper` to transcribe the videos, then collects meta data
-about the video using `requests_html`. It then uses the supplied cli arguments
-and file to open a Pull Request on
-the [bitcoinscript](https://github.com/bitcointranscripts/bitcointranscripts)
+This cli app transcribes audio and video for submission to the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo. 
+
+**Features**:
+- Transcription using [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/)
+- Collection of video's metadata when sourcing from YouTube
+- Open Pull Request on the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo for the resulting transcript.
+- Upload the resulting transcript to an AWS S3 Bucket
 repo.
+- Push the resulting transcript to [a Queuer backend](https://github.com/bitcointranscripts/transcription-review-backend)
 
 ## Steps:
 
