@@ -214,8 +214,7 @@ def add(
             except ValueError as e:
                 logger.error("Supplied date is invalid: ", e)
                 return
-
-        source_type = application.check_source_type(source=source)
+        (source_type, local) = application.check_source_type(source=source)
         if source_type is None:
             logger.error("Invalid source")
             return
@@ -238,6 +237,7 @@ def add(
             upload=upload,
             model_output_dir=model_output_dir,
             verbose=verbose,
+            local=local
         )
         if filename:
             """INITIALIZE GIT AND OPEN A PR"""
