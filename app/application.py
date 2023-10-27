@@ -584,19 +584,20 @@ def get_username():
 
 
 def check_source_type(source):
+    """Returns the type of source based on the file name
+    """
+    source_type = None
+    local = False
     if source.endswith(".mp3") or source.endswith(".wav"):
-        if os.path.isfile(source):
-            return "audio-local"
-        else:
-            return "audio"
+        source_type = "audio"
     elif check_if_playlist(source):
-        return "playlist"
-    elif os.path.isfile(source):
-        return "video-local"
+        source_type = "playlist"
     elif check_if_video(source):
-        return "video"
-    else:
-        return None
+        source_type = "video"
+    # check if source is a local file
+    if os.path.isfile(source):
+        local = True
+    return (source_type, local)
 
 
 def process_audio(
@@ -942,7 +943,7 @@ def process_source(
     username,
     source_type,
     chapters,
-    local=False,
+    local,
     test=None,
     pr=False,
     deepgram=False,
@@ -979,27 +980,6 @@ def process_source(
                 model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
-        elif source_type == "audio-local":
-            filename = process_audio(
-                source=source,
-                title=title,
-                event_date=event_date,
-                tags=tags,
-                category=category,
-                speakers=speakers,
-                loc=loc,
-                model=model,
-                username=username,
-                summarize=summarize,
-                local=True,
-                test=test,
-                pr=pr,
-                deepgram=deepgram,
-                diarize=diarize,
-                upload=upload,
-                model_output_dir=model_output_dir,
-                working_dir=tmp_dir,
-            )
         elif source_type == "playlist":
             filename = process_videos(
                 source=source,
@@ -1020,29 +1000,7 @@ def process_source(
                 model_output_dir=model_output_dir,
                 working_dir=tmp_dir,
             )
-        elif source_type == "video-local":
-            filename = process_video(
-                video=source,
-                title=title,
-                event_date=event_date,
-                summarize=summarize,
-                tags=tags,
-                category=category,
-                speakers=speakers,
-                loc=loc,
-                model=model,
-                username=username,
-                local=True,
-                diarize=diarize,
-                chapters=chapters,
-                test=test,
-                pr=pr,
-                deepgram=deepgram,
-                upload=upload,
-                model_output_dir=model_output_dir,
-                working_dir=tmp_dir,
-            )
-        else:
+        elif source_type == "video":
             filename = process_video(
                 video=source,
                 title=title,
@@ -1060,10 +1018,12 @@ def process_source(
                 test=test,
                 pr=pr,
                 deepgram=deepgram,
-                working_dir=tmp_dir,
                 upload=upload,
                 model_output_dir=model_output_dir,
+                working_dir=tmp_dir,
             )
+        else:
+            raise Exception(f"{source_type} is not a valid source type")
         return filename, tmp_dir
     except Exception as e:
         logger.error("Error processing source")
