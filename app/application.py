@@ -203,7 +203,7 @@ def process_mp3(filename, model, upload, model_output_dir):
         data_path = generate_srt(data, filename, model_output_dir)
         if upload:
             upload_file_to_s3(data_path)
-        logging.info("Removed video and audio files")
+        logger.info("Removed video and audio files")
         return data
     except Exception as e:
         logger.error("Error transcribing audio to text")
@@ -636,12 +636,12 @@ def process_audio(
                 url=source, title=title, working_dir=working_dir
             )
             abs_path = os.path.abspath(path=filename)
-            logger.info("filename", filename)
-            logger.info("abs_path", abs_path)
+            logger.info(f"filename: {filename}")
+            logger.info(f"abs_path: {abs_path}")
         else:
             filename = source.split("/")[-1]
             abs_path = os.path.abspath(source)
-        logger.info("processing audio file", abs_path)
+        logger.info(f"processing audio file: {abs_path}")
         if filename is None:
             logger.info("File not found")
             return
@@ -929,18 +929,6 @@ def process_video(
         logger.error(e)
 
 
-def setup_logger():
-    logger = logging.getLogger(__app_name__)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(
-        logging.DEBUG
-    )  # Set the desired log level for console output in the submodule
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
 
 def process_source(
     source,
@@ -964,19 +952,12 @@ def process_source(
     model_output_dir=None,
     verbose=False,
 ):
-    setup_logger()
-    logger = logging.getLogger(__app_name__)
     tmp_dir = tempfile.mkdtemp()
     model_output_dir = (
         "local_models/" if model_output_dir is None else model_output_dir
     )
 
     try:
-        if verbose:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.WARNING)
-
         if source_type == "audio":
             filename = process_audio(
                 source=source,
