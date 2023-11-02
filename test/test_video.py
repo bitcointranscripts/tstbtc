@@ -6,6 +6,7 @@ from datetime import datetime
 import pytest
 
 from app import application
+from app.transcription import Transcription
 
 
 def rel_path(path):
@@ -90,9 +91,6 @@ def check_md_file(
 
 @pytest.mark.feature
 def test_video_with_title():
-    with open(rel_path("testAssets/transcript.txt"), "r") as file:
-        result = file.read()
-        file.close()
     source = os.path.abspath(rel_path("testAssets/test_video.mp4"))
     username = "username"
     title = "test_video"
@@ -100,26 +98,17 @@ def test_video_with_title():
     tags = None
     category = None
     date = None
-    filename, tmp_dir = application.process_source(
-        source=source,
-        title=title,
-        event_date=date,
-        tags=tags,
-        category=category,
-        speakers=speakers,
-        loc="yada/yada",
-        model="tiny",
+    transcription = Transcription(
         username=username,
-        source_type="video",
-        local=True,
-        test=result,
-        chapters=False,
+        test_mode=True,
     )
-    assert tmp_dir is not None
-    filename = os.path.join(tmp_dir, filename)
-    assert os.path.isfile(filename)
+    transcription.add_transcription_source(
+        source, title, date, tags, category, speakers)
+    transcripts = transcription.start()
+
+    assert os.path.isfile(transcripts[0])
     assert check_md_file(
-        path=filename,
+        path=transcripts[0],
         transcript_by=username,
         media=source,
         title=title,
@@ -129,7 +118,7 @@ def test_video_with_title():
         speakers=speakers,
         local=True,
     )
-    application.clean_up(tmp_dir)
+    transcription.clean_up()
 
 
 @pytest.mark.feature
@@ -141,32 +130,21 @@ def test_video_with_all_options():
     tags = "tag1, tag2"
     category = "category"
     date = "2020-01-31"
-    date = datetime.strptime(date, "%Y-%m-%d").date()
-    filename, tmp_dir = application.process_source(
-        source=source,
-        title=title,
-        event_date=date,
-        tags=tags,
-        category=category,
-        speakers=speakers,
-        loc="yada/yada",
-        model="tiny",
+
+    transcription = Transcription(
         username=username,
-        source_type="video",
-        local=True,
-        test=True,
-        chapters=False,
+        test_mode=True,
     )
-    assert tmp_dir is not None
-    filename = os.path.join(tmp_dir, filename)
-    assert os.path.isfile(filename)
+    transcription.add_transcription_source(
+        source, title, date, tags, category, speakers)
+    transcripts = transcription.start()
+    assert os.path.isfile(transcripts[0])
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
-    date = date.strftime("%Y-%m-%d")
 
     assert check_md_file(
-        path=filename,
+        path=transcripts[0],
         transcript_by=username,
         media=source,
         title=title,
@@ -176,7 +154,7 @@ def test_video_with_all_options():
         speakers=speakers,
         local=True,
     )
-    application.clean_up(tmp_dir)
+    transcription.clean_up()
 
 
 @pytest.mark.feature
@@ -191,25 +169,16 @@ def test_video_with_chapters():
     tags = "tag1, tag2"
     category = "category"
     date = "2020-01-31"
-    date = datetime.strptime(date, "%Y-%m-%d").date()
-    filename, tmp_dir = application.process_source(
-        source=source,
-        title=title,
-        event_date=date,
-        tags=tags,
-        category=category,
-        speakers=speakers,
-        loc="yada/yada",
-        model="tiny",
+
+    transcription = Transcription(
         username=username,
-        source_type="video",
-        local=True,
-        test=result,
         chapters=True,
-        pr=True,
+        test_mode=True,
     )
-    assert tmp_dir is not None
-    filename = os.path.join(tmp_dir, filename)
+    transcription.add_transcription_source(
+        source, title, date, tags, category, speakers)
+    transcripts = transcription.start(result)
+
     chapter_names = []
     with open(rel_path("testAssets/test_video_chapters.chapters"), "r") as file:
         result = file.read()
@@ -218,14 +187,12 @@ def test_video_with_chapters():
                 chapter_names.append(x.split("= ")[1].strip())
         file.close()
 
-    print(filename)
-    assert os.path.isfile(filename)
+    assert os.path.isfile(transcripts[0])
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
-    date = date.strftime("%Y-%m-%d")
     assert check_md_file(
-        path=filename,
+        path=transcripts[0],
         transcript_by=username,
         media=source,
         title=title,
@@ -236,28 +203,34 @@ def test_video_with_chapters():
         chapters=chapter_names,
         local=True,
     )
-    application.clean_up(tmp_dir)
+    transcription.clean_up()
 
 
 @pytest.mark.feature
 def test_generate_payload():
-    date = "2020-01-31"
-    date = datetime.strptime(date, "%Y-%m-%d").date()
     with open(rel_path("testAssets/transcript.txt"), "r") as file:
         transcript = file.read()
         file.close()
-    payload = application.generate_payload(
-        loc=rel_path("yada/yada"),
-        title="test_title",
-        event_date=date,
-        tags=["tag1", "tag2"],
-        test=True,
-        category=["category1", "category2"],
-        speakers=["speaker1", "speaker2"],
+
+    source = rel_path("testAssets/test_video.mp4")
+    username = "username"
+    title = "test_title"
+    speakers = ["speaker1", "speaker2"]
+    tags = ["tag1", "tag2"]
+    category = ["category1", "category2"]
+    date = "2020-01-31"
+    loc = "yada/yada"
+
+    transcription = Transcription(
+        loc=loc,
         username="username",
-        media=rel_path("testAssets/test_video.mp4"),
-        transcript=transcript,
+        test_mode=True,
     )
+    transcription.add_transcription_source(
+        source, title, date, tags, category, speakers)
+    transcription.start(transcript)
+    payload = transcription.push_to_queue(transcription.transcripts[0])
+    transcription.clean_up()
     with open(rel_path("testAssets/payload.json"), "r") as outfile:
         content = json.load(outfile)
         outfile.close()
