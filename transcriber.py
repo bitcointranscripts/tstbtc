@@ -1,9 +1,11 @@
 import logging
-from datetime import datetime
+import tempfile
 
 import click
 
 from app import __app_name__, __version__, application
+from app.transcript import Transcript
+from app.transcription import Transcription
 
 
 def setup_logger():
@@ -111,20 +113,11 @@ def print_help(ctx, param, value):
     help="Supply this flag if you want to generate chapters for the transcript",
 )
 @click.option(
-    "-h",
-    "--help",
-    is_flag=True,
-    callback=print_help,
-    expose_value=False,
-    is_eager=True,
-    help="Show the application's help and exit.",
-)
-@click.option(
     "-p",
     "--PR",
     is_flag=True,
     default=False,
-    help="Supply this flag if you want to generate a payload",
+    help="Supply this flag if you want to open a PR at the bitcointranscripts repo",
 )
 @click.option(
     "-D",
@@ -171,6 +164,24 @@ def print_help(ctx, param, value):
     help="Supply this flag if you want to upload processed model files to AWS "
     "S3",
 )
+@click.option(
+    "--nocleanup",
+    is_flag=True,
+    default=False,
+    help="Do not remove temp files on exit",
+)
+@click.option(
+    "--noqueue",
+    is_flag=True,
+    default=False,
+    help="Do not push the resulting transcript to the Queuer backend",
+)
+@click.option(
+    "--markdown",
+    is_flag=True,
+    default=False,
+    help="Create a markdown file for the resulting transcript",
+)
 def add(
     source: str,
     loc: str,
@@ -188,6 +199,9 @@ def add(
     upload: bool,
     verbose: bool,
     model_output_dir: str,
+    nocleanup: bool,
+    noqueue: bool,
+    markdown: bool
 ) -> None:
     """Supply a YouTube video id and directory for transcription. \n
     Note: The https links need to be wrapped in quotes when running the command
@@ -199,51 +213,36 @@ def add(
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.WARNING)
+    tmp_dir = tempfile.mkdtemp()
 
     logger.info(
         "This tool will convert Youtube videos to mp3 files and then "
         "transcribe them to text using Whisper. "
     )
     try:
-        username = application.get_username()
-        loc = loc.strip("/")
-        event_date = None
-        if date:
-            try:
-                event_date = datetime.strptime(date, "%Y-%m-%d").date()
-            except ValueError as e:
-                logger.error("Supplied date is invalid: ", e)
-                return
-        (source_type, local) = application.check_source_type(source=source)
-        if source_type is None:
-            logger.error("Invalid source")
-            return
-        filename, tmp_dir = application.process_source(
-            source=source,
-            title=title,
-            event_date=event_date,
-            tags=tags,
-            category=category,
-            speakers=speakers,
+        transcription = Transcription(
             loc=loc,
             model=model,
-            username=username,
             chapters=chapters,
             pr=pr,
             summarize=summarize,
-            source_type=source_type,
             deepgram=deepgram,
             diarize=diarize,
             upload=upload,
             model_output_dir=model_output_dir,
-            verbose=verbose,
-            local=local
+            nocleanup=nocleanup,
+            queue=not noqueue,
+            markdown=markdown,
+            working_dir=tmp_dir
         )
-        if filename:
-            """INITIALIZE GIT AND OPEN A PR"""
-            logger.info("Transcription complete")
-        logger.info("Cleaning up...")
-        application.clean_up(tmp_dir)
+        transcription.add_transcription_source(
+            source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers,
+        )
+        transcription.start()
+        if nocleanup:
+            logger.info("Not cleaning up temp files...")
+        else:
+            transcription.clean_up()
     except Exception as e:
         logger.error(e)
-        logger.error("Cleaning up...")
+        logger.info(f"Exited with error, not cleaning up temp files: {tmp_dir}")
