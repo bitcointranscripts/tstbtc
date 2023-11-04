@@ -26,6 +26,9 @@ from pytube.exceptions import PytubeError
 
 from app import __app_name__, __version__
 from app.utils import write_to_json
+from app.logging import get_logger
+
+logger = get_logger()
 
 
 def convert_wav_to_mp3(abs_path, filename, working_dir="tmp/"):
@@ -85,7 +88,7 @@ def combine_chapter(chapters, transcript, working_dir="tmp/"):
 
 
 def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
-    logger = logging.getLogger(__app_name__)
+    logger.info("(deepgram) Combining transcript with detected chapters...")
     try:
         para = ""
         string = ""
@@ -146,7 +149,6 @@ def get_deepgram_transcript(deepgram_data, diarize, title, upload, model_output_
     logger = logging.getLogger(__app_name__)
 
     def save_local_json(json_data, title, model_output_dir):
-        logger.info(f"Saving Locally...")
         time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         if not os.path.isdir(model_output_dir):
             os.makedirs(model_output_dir)
@@ -155,7 +157,7 @@ def get_deepgram_transcript(deepgram_data, diarize, title, upload, model_output_
         )
         with open(file_path, "w") as json_file:
             json.dump(json_data, json_file, indent=4)
-        logger.info(f"Model stored at path {file_path}")
+        logger.info(f"(deepgram) Model stored at: {file_path}")
         return file_path
     try:
         data_path = write_to_json(
@@ -164,6 +166,7 @@ def get_deepgram_transcript(deepgram_data, diarize, title, upload, model_output_
         if upload:
             upload_file_to_s3(data_path)
         if diarize:
+            logger.info(f"(deepgram) Processing diarization...")
             para = ""
             string = ""
             curr_speaker = None
@@ -258,7 +261,7 @@ def create_pr(absolute_path, loc, username, curr_time, title):
 
 
 def combine_deepgram_with_chapters(deepgram_data, chapters):
-    logger = logging.getLogger(__app_name__)
+    logger.info("(deepgram) Combining transcript with detected chapters...")
     try:
         chapters_pointer = 0
         words_pointer = 0
@@ -301,15 +304,13 @@ def clean_up(tmp_dir):
 
 
 def generate_srt(data, filename, model_output_dir):
-    logger = logging.getLogger(__app_name__)
-    logger.info("Saving Locally...")
     time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     if not os.path.isdir(model_output_dir):
         os.makedirs(model_output_dir)
     output_file = os.path.join(
         model_output_dir, filename + "_" + time_in_str + ".srt"
     )
-    logger.debug(f"Writing srt to {output_file}")
+    logger.info(f"Writing srt to {output_file}...")
     with open(output_file, "w") as f:
         for index, segment in enumerate(data):
             start_time, end_time, text = segment

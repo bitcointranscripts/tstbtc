@@ -6,19 +6,9 @@ import click
 from app import __app_name__, __version__, application
 from app.transcript import Transcript
 from app.transcription import Transcription
+from app.logging import configure_logger, get_logger
 
-
-def setup_logger():
-    logger = logging.getLogger(__app_name__)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(
-        logging.DEBUG
-    )  # Set the desired log level for console output in the submodule
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+logger = get_logger()
 
 
 @click.group()
@@ -207,13 +197,8 @@ def add(
     Note: The https links need to be wrapped in quotes when running the command
     on zsh
     """
-    setup_logger()
-    logger = logging.getLogger(__app_name__)
-    if verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.WARNING)
     tmp_dir = tempfile.mkdtemp()
+    configure_logger(logging.DEBUG if verbose else logging.INFO, tmp_dir)
 
     logger.info(
         "This tool will convert Youtube videos to mp3 files and then "

@@ -15,6 +15,7 @@ from clint.textui import progress
 from moviepy.editor import VideoFileClip
 
 from app import __app_name__, __version__, application
+from app.logging import get_logger
 from app.utils import slugify
 
 logger = get_logger()
@@ -24,7 +25,7 @@ class Transcript:
     def __init__(self, source, test_mode=False):
         self.source = source
         self.test_mode = test_mode
-        self.logger = logging.getLogger(__app_name__)
+        self.logger = get_logger()
 
     def create_transcript(self):
         result = ""
@@ -202,7 +203,7 @@ class Source:
         self.tags = tags
         self.category = category
         self.speakers = speakers
-        self.logger = logging.getLogger(__app_name__)
+        self.logger = get_logger()
         self.preprocess = preprocess
 
     def __config_event_date(self, date):

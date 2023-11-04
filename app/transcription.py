@@ -15,6 +15,7 @@ import yt_dlp
 from app.transcript import Transcript, Source, Audio, Video, Playlist
 from app import __app_name__, __version__, application
 from app.utils import write_to_json
+from app.logging import get_logger
 
 
 class Transcription:
@@ -37,7 +38,7 @@ class Transcription:
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
         self.test_mode = test_mode
-        self.logger = logging.getLogger(__app_name__)
+        self.logger = get_logger()
         self.tmp_dir = working_dir if working_dir is not None else tempfile.mkdtemp()
 
         self.logger.info(f"Temp directory: {self.tmp_dir}")
