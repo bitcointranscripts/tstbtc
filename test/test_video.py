@@ -216,7 +216,7 @@ def test_generate_payload():
     username = "username"
     title = "test_title"
     speakers = ["speaker1", "speaker2"]
-    tags = ["tag1", "tag2"]
+    tags = []
     category = ["category1", "category2"]
     date = "2020-01-31"
     loc = "yada/yada"

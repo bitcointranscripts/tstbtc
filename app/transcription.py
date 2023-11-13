@@ -113,7 +113,7 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error from assigning source: {e}")
 
-    def add_transcription_source(self, source_file, title=None, date=None, tags=None, category=None, speakers=None, preprocess=True, youtube_metadata=None, chapters=None):
+    def add_transcription_source(self, source_file, title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, chapters=None):
         """Add a source for transcription"""
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
