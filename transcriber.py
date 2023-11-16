@@ -1,22 +1,14 @@
 import logging
-from datetime import datetime
+import tempfile
 
 import click
 
 from app import __app_name__, __version__, application
+from app.transcript import Transcript
+from app.transcription import Transcription
+from app.logging import configure_logger, get_logger
 
-
-def setup_logger():
-    logger = logging.getLogger(__app_name__)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(
-        logging.DEBUG
-    )  # Set the desired log level for console output in the submodule
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+logger = get_logger()
 
 
 @click.group()
@@ -38,10 +30,7 @@ def print_help(ctx, param, value):
     ctx.exit()
 
 
-@click.command()
-@click.argument("source", nargs=1)
-@click.argument("loc", nargs=1)
-@click.option(
+whisper = click.option(
     "-m",
     "--model",
     type=click.Choice(
@@ -58,42 +47,135 @@ def print_help(ctx, param, value):
         ]
     ),
     default="tiny.en",
-    help="Options for transcription model",
+    show_default=True,
+    help="Select which whisper model to use for the transcription",
 )
+deepgram = click.option(
+    "-D",
+    "--deepgram",
+    is_flag=True,
+    default=False,
+    help="Use deepgram for transcription",
+)
+diarize = click.option(
+    "-M",
+    "--diarize",
+    is_flag=True,
+    default=False,
+    help="Supply this flag if you have multiple speakers AKA "
+    "want to diarize the content",
+)
+summarize = click.option(
+    "-S",
+    "--summarize",
+    is_flag=True,
+    default=False,
+    help="Summarize the transcript [only available with deepgram]",
+)
+use_youtube_chapters = click.option(
+    "-C",
+    "--chapters",
+    is_flag=True,
+    default=False,
+    help="For YouTube videos, include the YouTube chapters and timestamps in the resulting transcript.",
+)
+open_pr = click.option(
+    "-p",
+    "--PR",
+    is_flag=True,
+    default=False,
+    help="Open a PR on the bitcointranscripts repo",
+)
+upload_to_s3 = click.option(
+    "-u",
+    "--upload",
+    is_flag=True,
+    default=False,
+    help="Upload processed model files to AWS S3",
+)
+save_to_markdown = click.option(
+    "--markdown",
+    is_flag=True,
+    default=False,
+    help="Save the resulting transcript to a markdown format supported by bitcointranscripts",
+)
+noqueue = click.option(
+    "--noqueue",
+    is_flag=True,
+    default=False,
+    help="Do not push the resulting transcript to the Queuer backend",
+)
+model_output_dir = click.option(
+    "-o",
+    "--model_output_dir",
+    type=str,
+    default="local_models/",
+    show_default=True,
+    help="Set the directory for saving model outputs",
+)
+nocleanup = click.option(
+    "--nocleanup",
+    is_flag=True,
+    default=False,
+    help="Do not remove temp files on exit",
+)
+verbose_logging = click.option(
+    "-V",
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help="Supply this flag to enable verbose logging",
+)
+
+
+@cli.command()
+@click.argument("source", nargs=1)
+@click.argument("loc", nargs=1)
+# Available transcription models and services
+@whisper
+@deepgram
+# Options for adding metadata
 @click.option(
     "-t",
     "--title",
     type=str,
-    help="Supply transcribed file title in 'quotes', title is mandatory in case"
-    " of audio files",
+    help="Add the title for the resulting transcript (required for audio files)",
 )
 @click.option(
     "-d",
     "--date",
     type=str,
-    help="Supply the event date in format 'yyyy-mm-dd'",
+    help="Add the event date to transcript's metadata in format 'yyyy-mm-dd'",
 )
 @click.option(
     "-T",
     "--tags",
-    type=str,
-    help="Supply the tags for the transcript in 'quotes' and separated by "
-    "commas",
+    multiple=True,
+    help="Add a tag to transcript's metadata (can be used multiple times)",
 )
 @click.option(
     "-s",
     "--speakers",
-    type=str,
-    help="Supply the speakers for the transcript in 'quotes' and separated by "
-    "commas",
+    multiple=True,
+    help="Add a speaker to the transcript's metadata (can be used multiple times)",
 )
 @click.option(
     "-c",
     "--category",
-    type=str,
-    help="Supply the category for the transcript in 'quotes' and separated by "
-    "commas",
+    multiple=True,
+    help="Add a category to the transcript's metadata (can be used multiple times)",
 )
+# Options for configuring the transcription process
+@diarize
+@summarize
+@use_youtube_chapters
+@open_pr
+@upload_to_s3
+@save_to_markdown
+@noqueue
+@model_output_dir
+@nocleanup
+@verbose_logging
 @click.option(
     "-v",
     "--version",
@@ -103,83 +185,15 @@ def print_help(ctx, param, value):
     is_eager=True,
     help="Show the application's version and exit.",
 )
-@click.option(
-    "-C",
-    "--chapters",
-    is_flag=True,
-    default=False,
-    help="Supply this flag if you want to generate chapters for the transcript",
-)
-@click.option(
-    "-h",
-    "--help",
-    is_flag=True,
-    callback=print_help,
-    expose_value=False,
-    is_eager=True,
-    help="Show the application's help and exit.",
-)
-@click.option(
-    "-p",
-    "--PR",
-    is_flag=True,
-    default=False,
-    help="Supply this flag if you want to generate a payload",
-)
-@click.option(
-    "-D",
-    "--deepgram",
-    is_flag=True,
-    default=False,
-    help="Supply this flag if you want to use deepgram",
-)
-@click.option(
-    "-S",
-    "--summarize",
-    is_flag=True,
-    default=False,
-    help="Supply this flag if you want to summarize the content",
-)
-@click.option(
-    "-M",
-    "--diarize",
-    is_flag=True,
-    default=False,
-    help="Supply this flag if you have multiple speakers AKA "
-    "want to diarize the content",
-)
-@click.option(
-    "-V",
-    "--verbose",
-    is_flag=True,
-    default=False,
-    help="Supply this flag to enable verbose logging",
-)
-@click.option(
-    "-o",
-    "--model_output_dir",
-    type=str,
-    default="local_models/",
-    help="Supply this flag if you want to change the directory for saving "
-    "model outputs",
-)
-@click.option(
-    "-u",
-    "--upload",
-    is_flag=True,
-    default=False,
-    help="Supply this flag if you want to upload processed model files to AWS "
-    "S3",
-)
 def add(
     source: str,
     loc: str,
     model: str,
     title: str,
     date: str,
-    tags: str,
-    speakers: str,
-    category: str,
+    tags: list,
+    speakers: list,
+    category: list,
     chapters: bool,
     pr: bool,
     deepgram: bool,
@@ -188,62 +202,47 @@ def add(
     upload: bool,
     verbose: bool,
     model_output_dir: str,
+    nocleanup: bool,
+    noqueue: bool,
+    markdown: bool
 ) -> None:
-    """Supply a YouTube video id and directory for transcription. \n
+    """Transcribe the given source. Suported sources:
+    YouTube videos, YouTube playlists, Local and remote audio files
+
     Note: The https links need to be wrapped in quotes when running the command
     on zsh
     """
-    setup_logger()
-    logger = logging.getLogger(__app_name__)
-    if verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.WARNING)
+    tmp_dir = tempfile.mkdtemp()
+    configure_logger(logging.DEBUG if verbose else logging.INFO, tmp_dir)
 
     logger.info(
         "This tool will convert Youtube videos to mp3 files and then "
         "transcribe them to text using Whisper. "
     )
     try:
-        username = application.get_username()
-        loc = loc.strip("/")
-        event_date = None
-        if date:
-            try:
-                event_date = datetime.strptime(date, "%Y-%m-%d").date()
-            except ValueError as e:
-                logger.error("Supplied date is invalid: ", e)
-                return
-        (source_type, local) = application.check_source_type(source=source)
-        if source_type is None:
-            logger.error("Invalid source")
-            return
-        filename, tmp_dir = application.process_source(
-            source=source,
-            title=title,
-            event_date=event_date,
-            tags=tags,
-            category=category,
-            speakers=speakers,
+        transcription = Transcription(
             loc=loc,
             model=model,
-            username=username,
             chapters=chapters,
             pr=pr,
             summarize=summarize,
-            source_type=source_type,
             deepgram=deepgram,
             diarize=diarize,
             upload=upload,
             model_output_dir=model_output_dir,
-            verbose=verbose,
-            local=local
+            nocleanup=nocleanup,
+            queue=not noqueue,
+            markdown=markdown,
+            working_dir=tmp_dir
         )
-        if filename:
-            """INITIALIZE GIT AND OPEN A PR"""
-            logger.info("Transcription complete")
-        logger.info("Cleaning up...")
-        application.clean_up(tmp_dir)
+        transcription.add_transcription_source(
+            source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers,
+        )
+        transcription.start()
+        if nocleanup:
+            logger.info("Not cleaning up temp files...")
+        else:
+            transcription.clean_up()
     except Exception as e:
         logger.error(e)
-        logger.error("Cleaning up...")
+        logger.info(f"Exited with error, not cleaning up temp files: {tmp_dir}")

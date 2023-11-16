@@ -4,6 +4,7 @@ from datetime import datetime
 import pytest
 
 from app import application
+from app.transcription import Transcription
 
 
 def rel_path(path):
@@ -67,32 +68,21 @@ def test_audio_with_title():
     source = rel_path("testAssets/audio.mp3")
     title = "title"
     username = "username"
-    filename, tmp_dir = application.process_source(
-        source=source,
-        title=title,
-        event_date=None,
-        tags=None,
-        category=None,
-        speakers=None,
-        loc=rel_path("yada/yada"),
-        model="tiny",
+    transcription = Transcription(
         username=username,
-        source_type="audio",
-        local=True,
-        test=result,
-        chapters=False,
-        pr=False,
+        test_mode=True,
     )
-    filename = os.path.join(tmp_dir, filename)
-    assert os.path.isfile(filename)
+    transcription.add_transcription_source(source, title)
+    transcripts = transcription.start()
+    assert os.path.isfile(transcripts[0])
     assert check_md_file(
-        path=filename,
+        path=transcripts[0],
         transcript_by=username,
         media=source,
         title=title,
         local=True,
     )
-    application.clean_up(tmp_dir)
+    transcription.clean_up()
 
 
 @pytest.mark.feature
@@ -102,29 +92,14 @@ def test_audio_without_title():
         file.close()
 
     source = rel_path("test/testAssets/audio.mp3")
-    username = "username"
     title = None
-    filename, tmp_dir = application.process_source(
-        source=source,
-        title=title,
-        event_date=None,
-        tags=None,
-        category=None,
-        speakers=None,
-        loc=rel_path("yada/yada"),
-        model="tiny",
-        username=username,
-        pr=False,
-        source_type="audio",
-        local=True,
-        test=result,
-        chapters=False,
+    transcription = Transcription(
+        test_mode=True
     )
-    assert filename is None
-    assert not check_md_file(
-        path=filename, transcript_by=username, media=source, title=title
-    )
-    application.clean_up(tmp_dir)
+    with pytest.raises(Exception) as error:
+        transcription.add_transcription_source(source, title)
+    assert "Please supply a title for the audio file" in str(error)
+    transcription.clean_up()
 
 
 @pytest.mark.feature
@@ -139,31 +114,20 @@ def test_audio_with_all_data():
     tags = "tag1, tag2"
     category = "category"
     date = "2020-01-31"
-    date = datetime.strptime(date, "%Y-%m-%d").date()
-    filename, tmp_dir = application.process_source(
-        source=source,
-        title=title,
-        event_date=date,
-        tags=tags,
-        category=category,
-        speakers=speakers,
-        loc=rel_path("yada/yada"),
-        model="tiny",
+    transcription = Transcription(
         username=username,
-        source_type="audio",
-        local=True,
-        test=result,
-        chapters=False,
-        pr=False,
+        test_mode=True,
     )
+    transcription.add_transcription_source(
+        source, title, date, tags, category, speakers)
+    transcripts = transcription.start()
+    
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]
-    date = date.strftime("%Y-%m-%d")
-    filename = os.path.join(tmp_dir, filename)
-    assert os.path.isfile(filename)
+    assert os.path.isfile(transcripts[0])
     assert check_md_file(
-        path=filename,
+        path=transcripts[0],
         transcript_by=username,
         media=source,
         title=title,
@@ -173,4 +137,4 @@ def test_audio_with_all_data():
         speakers=speakers,
         local=True,
     )
-    application.clean_up(tmp_dir)
+    transcription.clean_up()
