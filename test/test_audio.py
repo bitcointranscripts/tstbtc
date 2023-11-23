@@ -72,7 +72,7 @@ def test_audio_with_title():
         username=username,
         test_mode=True,
     )
-    transcription.add_transcription_source(source, title)
+    transcription.add_transcription_source(source_file=source, title=title)
     transcripts = transcription.start()
     assert os.path.isfile(transcripts[0])
     assert check_md_file(
@@ -97,7 +97,7 @@ def test_audio_without_title():
         test_mode=True
     )
     with pytest.raises(Exception) as error:
-        transcription.add_transcription_source(source, title)
+        transcription.add_transcription_source(source_file=source, title=title)
     assert "Please supply a title for the audio file" in str(error)
     transcription.clean_up()
 
@@ -119,9 +119,9 @@ def test_audio_with_all_data():
         test_mode=True,
     )
     transcription.add_transcription_source(
-        source, title, date, tags, category, speakers)
+        source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start()
-    
+
     category = [cat.strip() for cat in category.split(",")]
     tags = [tag.strip() for tag in tags.split(",")]
     speakers = [speaker.strip() for speaker in speakers.split(",")]

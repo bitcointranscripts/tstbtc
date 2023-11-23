@@ -189,15 +189,16 @@ class Transcript:
 
 
 class Source:
-    def __init__(self, source_file, local, title, date, tags, category, speakers, preprocess):
+    def __init__(self, source_file, loc, local, title, date, tags, category, speakers, preprocess):
         # initialize source with arguments
-        self.save_source(source_file, local, title, date,
+        self.save_source(source_file, loc, local, title, date,
                          tags, category, speakers, preprocess)
         self.__config_event_date(date)
         self.logger = get_logger()
 
-    def save_source(self, source_file, local, title, date, tags, category, speakers, preprocess):
+    def save_source(self, source_file, loc, local, title, date, tags, category, speakers, preprocess):
         self.source_file = source_file
+        self.loc = loc.strip("/")
         self.local = local
         self.title = title
         self.tags = tags
@@ -232,7 +233,7 @@ class Audio(Source):
     def __init__(self, source):
         try:
             # initialize source using a base Source
-            super().__init__(source.source_file, source.local, source.title, source.event_date,
+            super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
                              source.tags, source.category, source.speakers, source.preprocess)
             self.type = "audio"
             self.__config_source()
@@ -299,7 +300,7 @@ class Video(Source):
     def __init__(self, source, youtube_metadata=None, chapters=None):
         try:
             # initialize source using a base Source
-            super().__init__(source.source_file, source.local, source.title, source.event_date,
+            super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
                              source.tags, source.category, source.speakers, source.preprocess)
             self.type = "video"
             self.youtube_metadata = youtube_metadata
@@ -417,7 +418,7 @@ class Playlist(Source):
     def __init__(self, source, entries, preprocess=False):
         try:
             # initialize source using a base Source
-            super().__init__(source.source_file, source.local, source.title, source.event_date,
+            super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
                              source.tags, source.category, source.speakers, source.preprocess)
             self.__config_source(entries)
         except Exception as e:
@@ -428,6 +429,6 @@ class Playlist(Source):
         self.videos = []
         for entry in entries:
             if entry["title"] != '[Private video]':
-                source = Video(source=Source(entry["url"], self.local, entry["title"], self.event_date,
+                source = Video(source=Source(entry["url"], self.loc, self.local, entry["title"], self.event_date,
                                              self.tags, self.category, self.speakers, self.preprocess))
                 self.videos.append(source)

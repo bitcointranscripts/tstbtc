@@ -136,7 +136,7 @@ def test_video_with_all_options():
         test_mode=True,
     )
     transcription.add_transcription_source(
-        source, title, date, tags, category, speakers)
+        source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start()
     assert os.path.isfile(transcripts[0])
     category = [cat.strip() for cat in category.split(",")]
@@ -176,7 +176,7 @@ def test_video_with_chapters():
         test_mode=True,
     )
     transcription.add_transcription_source(
-        source, title, date, tags, category, speakers)
+        source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start(result)
 
     chapter_names = []
@@ -222,13 +222,12 @@ def test_generate_payload():
     loc = "yada/yada"
 
     transcription = Transcription(
-        loc=loc,
         username="username",
         test_mode=True,
     )
     transcription.add_transcription_source(
-        source, title, date, tags, category, speakers)
-    transcription.start(transcript)
+        source_file=source, loc=loc, title=title, date=date, tags=tags, category=category, speakers=speakers)
+    transcription.start(test_transcript=transcript)
     payload = transcription.push_to_queue(transcription.transcripts[0])
     transcription.clean_up()
     with open(rel_path("testAssets/payload.json"), "r") as outfile:

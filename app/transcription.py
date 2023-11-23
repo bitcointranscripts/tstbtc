@@ -19,18 +19,16 @@ from app.logging import get_logger
 
 
 class Transcription:
-    def __init__(self, loc="test/test", model="tiny", chapters=False, pr=False, summarize=False, deepgram=False, diarize=False, upload=False, model_output_dir="local_models/", nocleanup=False, queue=True, markdown=False, username=None, test_mode=False,  working_dir=None):
+    def __init__(self, model="tiny", chapters=False, pr=False, summarize=False, deepgram=False, diarize=False, upload=False, model_output_dir="local_models/", nocleanup=False, queue=True, markdown=False, username=None, test_mode=False,  working_dir=None):
         self.model = model
         self.transcript_by = "username" if test_mode else self.__get_username()
-        # location in the bitcointranscripts hierarchy
-        self.loc = loc.strip("/")
         self.generate_chapters = chapters
         self.open_pr = pr
         self.summarize_transcript = summarize
         self.service = "deepgram" if deepgram else model
         self.diarize = diarize
         self.upload = upload
-        self.model_output_dir = f"{model_output_dir}/{self.loc}"
+        self.model_output_dir = model_output_dir
         self.transcripts = []
         self.nocleanup = nocleanup
         # during testing we do not have/need a queuer backend
@@ -113,7 +111,7 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error from assigning source: {e}")
 
-    def add_transcription_source(self, source_file, title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, chapters=None):
+    def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, chapters=None, nocheck=False):
         """Add a source for transcription"""
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
@@ -122,7 +120,7 @@ class Transcription:
             local = True
         # initialize source
         source = self._initialize_source(
-            source=Source(source_file, local, title, date,
+            source=Source(source_file, loc, local, title, date,
                           tags, category, speakers, preprocess),
             youtube_metadata=youtube_metadata,
             chapters=chapters)
@@ -150,7 +148,7 @@ class Transcription:
                     "categories": transcript.source.category,
                     "tags": transcript.source.tags,
                     "speakers": transcript.source.speakers,
-                    "loc": self.loc,
+                    "loc": transcript.source.loc,
                     "body": transcript.result,
                 }
             }
@@ -176,7 +174,7 @@ class Transcription:
                     else:
                         # store payload in case the user wants to manually send it to the queuer
                         payload_json_file = write_to_json(
-                            payload, self.model_output_dir, f"{transcript.title}_payload")
+                            payload, f"{self.model_output_dir}/{transcript.source.loc}", f"{transcript.title}_payload")
                         self.logger.info(
                             f"Transcript not added to the queue, payload stored at: {payload_json_file}")
                         return payload_json_file
@@ -208,6 +206,7 @@ class Transcription:
         self.result = []
         try:
             for transcript in self.transcripts:
+                output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
                 self.logger.info(
                     f"Processing source: {transcript.source.source_file}")
                 tmp_dir = self._create_subdirectory(
@@ -220,12 +219,12 @@ class Transcription:
                     self.service,
                     self.diarize,
                     self.upload,
-                    self.model_output_dir,
+                    output_dir,
                     test_transcript=test_transcript
                 )
                 if self.markdown:
                     transcription_md_file = transcript.write_to_file(
-                        self.model_output_dir if not self.test_mode else tmp_dir,
+                        output_dir if not self.test_mode else tmp_dir,
                         self.transcript_by)
                     self.result.append(transcription_md_file)
                 else:
@@ -233,7 +232,7 @@ class Transcription:
                 if self.open_pr:
                     application.create_pr(
                         absolute_path=transcription_md_file,
-                        loc=self.loc,
+                        loc=transcript.source.source_file,
                         username=self.transcript_by,
                         curr_time=str(round(time.time() * 1000)),
                         title=transcript.title,

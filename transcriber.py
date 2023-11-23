@@ -130,7 +130,7 @@ verbose_logging = click.option(
 
 @cli.command()
 @click.argument("source", nargs=1)
-@click.argument("loc", nargs=1)
+@click.argument("loc", nargs=1) # location in the bitcointranscripts hierarchy
 # Available transcription models and services
 @whisper
 @deepgram
@@ -221,7 +221,6 @@ def add(
     )
     try:
         transcription = Transcription(
-            loc=loc,
             model=model,
             chapters=chapters,
             pr=pr,
@@ -236,7 +235,7 @@ def add(
             working_dir=tmp_dir
         )
         transcription.add_transcription_source(
-            source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers,
+            source_file=source, loc=loc, title=title, date=date, tags=tags, category=category, speakers=speakers,
         )
         transcription.start()
         if nocleanup:
