@@ -3,9 +3,10 @@ import logging
 import os
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import datetime, date
 from urllib.parse import parse_qs, urlparse
 
+import feedparser
 import pytube
 import requests
 import static_ffmpeg
@@ -436,3 +437,33 @@ class Playlist(Source):
                 source = Video(source=Source(entry["url"], self.loc, self.local, entry["title"], self.event_date,
                                              self.tags, self.category, self.speakers, self.preprocess))
                 self.videos.append(source)
+
+
+class RSS(Source):
+    def __init__(self, source):
+        super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
+                         source.tags, source.category, source.speakers, source.preprocess)
+        self.type = "rss"
+        self.entries = []
+        self.__config_source()
+
+    def __config_source(self):
+        try:
+            rss = feedparser.parse(self.source_file)
+            self.title = rss.feed.title
+            self.author = rss.feed.author
+            self.logger.info(
+                f"RSS feed detected: {self.title} by {self.author}")
+        except Exception as e:
+            raise Exception(f"Invalid source: {self.source_file}")
+        for entry in rss.entries:
+            enclosure = next(
+                (link for link in entry.links if link.get('rel') == 'enclosure'), None)
+            if enclosure.type in ['audio/mpeg', 'audio/wav', 'audio/x-m4a']:
+                published_date = date(*entry.published_parsed[:3])
+                source = Audio(Source(enclosure.href, self.loc, self.local, entry.title, published_date, self.tags,
+                               self.category, self.speakers, self.preprocess, link=entry.link))
+                self.entries.append(source)
+            else:
+                self.logger.warning(
+                    f"Invalid source for '{entry.title}'. '{enclosure.type}' not supported for RSS feeds, source skipped.")

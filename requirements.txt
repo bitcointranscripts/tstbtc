@@ -14,3 +14,4 @@ boto3==1.26.143
 black==23.3.0
 flake8==6.0.0
 isort==5.12.0
+feedparser==6.0.10

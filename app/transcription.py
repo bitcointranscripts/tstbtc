@@ -12,7 +12,7 @@ from pytube.exceptions import PytubeError
 import requests
 import yt_dlp
 
-from app.transcript import Transcript, Source, Audio, Video, Playlist
+from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
 from app import __app_name__, __version__, application
 from app.utils import write_to_json
 from app.logging import get_logger
@@ -93,8 +93,10 @@ class Transcription:
                 # Invalid URL or video not found
                 raise Exception(f"Invalid source: {e}")
         try:
-            if source.source_file.endswith(".mp3") or source.source_file.endswith(".wav"):
+            if source.source_file.endswith(".mp3") or source.source_file.endswith(".wav") or source.source_file.endswith(".m4a"):
                 return Audio(source=source)
+            if source.source_file.endswith("rss") or source.source_file.endswith(".xml"):
+                return RSS(source=source)
 
             if youtube_metadata is not None:
                 # we have youtube metadata, this can only be true for videos
@@ -130,6 +132,11 @@ class Transcription:
             for video in source.videos:
                 transcription_sources['added'].append(video)
                 self.transcripts.append(Transcript(video, self.test_mode))
+        elif source.type == 'rss':
+            # add a transcript for each source/audio in the rss feed
+            for entry in source.entries:
+                transcription_sources['added'].append(entry)
+                self.transcripts.append(Transcript(entry, self.test_mode))
         elif source.type in ['audio', 'video']:
             transcription_sources['added'].append(source)
             self.transcripts.append(Transcript(source, self.test_mode))
