@@ -235,12 +235,14 @@ class Source:
 
 
 class Audio(Source):
-    def __init__(self, source):
+    def __init__(self, source, description=None, chapters=[]):
         try:
             # initialize source using a base Source
             super().__init__(source_file=source.source_file, link=source.link, loc=source.loc, local=source.local, title=source.title,
                              date=source.event_date, tags=source.tags, category=source.category, speakers=source.speakers, preprocess=source.preprocess)
             self.type = "audio"
+            self.description = description
+            self.chapters = chapters
             self.__config_source()
         except Exception as e:
             raise Exception(f"Error during Audio creation: {e}")
@@ -299,6 +301,20 @@ class Audio(Source):
         except Exception as e:
             raise Exception(f"Error processing audio file: {e}")
 
+    def to_json(self):
+        return {
+            'type': self.type,
+            'loc': self.loc,
+            "source_file": self.source_file,
+            "media": self.media,
+            'title': self.title,
+            'categories': self.category,
+            'tags': self.tags,
+            'speakers': self.speakers,
+            'date': self.event_date.strftime("%Y-%m-%d"),
+            'description': self.description,
+            'chapters': self.chapters,
+        }
 
 
 class Video(Source):
@@ -418,6 +434,20 @@ class Video(Source):
         except Exception as e:
             raise Exception(f"Error processing video file: {e}")
 
+    def to_json(self):
+        return {
+            'type': self.type,
+            'loc': self.loc,
+            "source_file": self.source_file,
+            'title': self.title,
+            'categories': self.category,
+            'tags': self.tags,
+            'speakers': self.speakers,
+            'date': self.event_date.strftime("%Y-%m-%d"),
+            'chapters': self.chapters,
+            'youtube': self.youtube_metadata
+        }
+
 
 class Playlist(Source):
     def __init__(self, source, entries, preprocess=False):
@@ -462,7 +492,7 @@ class RSS(Source):
             if enclosure.type in ['audio/mpeg', 'audio/wav', 'audio/x-m4a']:
                 published_date = date(*entry.published_parsed[:3])
                 source = Audio(Source(enclosure.href, self.loc, self.local, entry.title, published_date, self.tags,
-                               self.category, self.speakers, self.preprocess, link=entry.link))
+                               self.category, self.speakers, self.preprocess, link=entry.link), description=entry.description)
                 self.entries.append(source)
             else:
                 self.logger.warning(

@@ -27,6 +27,6 @@ setup(
     ],
     entry_points="""
         [console_scripts]
-        tstbtc=transcriber:add
+        tstbtc=transcriber:cli
     """,
 )

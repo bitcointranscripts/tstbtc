@@ -26,6 +26,11 @@ def write_to_json(json_data, output_dir, filename, add_timestamp=True):
     return file_path
 
 
+def check_if_valid_file_path(file_path):
+    if not isinstance(file_path, str) or not os.path.isfile(file_path):
+        raise Exception(f"Not a valid file: {file_path}")
+
+
 def get_status():
     """Helper method to fetch and store status.json locally"""
     STATUS_FILE_PATH = "status.json"  # the file path for storing the status locally

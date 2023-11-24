@@ -79,7 +79,7 @@ To check the version:
 
 ## Usage
 
-`tstbtc {source_file/url} {directory}` transcribe the given source
+`tstbtc transcribe {source_file/url} {directory}` transcribe the given source
 
 Suported sources:
   - YouTube videos
@@ -120,13 +120,13 @@ from Stephan Livera's podcast and add the associated metadata, we would run eith
 of the below commands. The first uses short argument tags, while the second uses
 long argument tags. The result is the same.
 
-- `tstbtc Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast -t 'OP_Vault - A New Way to HODL?' -d '2023-01-30' -T 'script' -T 'op_vault' -s 'James O’Beirne' -s 'Stephan Livera' -c ‘podcast’`
-- `tstbtc Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast --title 'OP_Vault - A New Way to HODL?' --date '2023-01-30' --tags 'script' --tags 'op_vault' --speakers 'James O’Beirne' --speakers 'Stephan Livera' --category ‘podcast’`
+- `tstbtc transcribe Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast -t 'OP_Vault - A New Way to HODL?' -d '2023-01-30' -T 'script' -T 'op_vault' -s 'James O’Beirne' -s 'Stephan Livera' -c ‘podcast’`
+- `tstbtc transcribe Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast --title 'OP_Vault - A New Way to HODL?' --date '2023-01-30' --tags 'script' --tags 'op_vault' --speakers 'James O’Beirne' --speakers 'Stephan Livera' --category ‘podcast’`
 
 You can also transcribe a remote audio/mp3 link, such as the following from Stephan Livera's podcast: 
 ```shell
 mp3_link="https://anchor.fm/s/7d083a4/podcast/play/64348045/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2023-1-1%2Ff7fafb12-9441-7d85-d557-e9e5d18ab788.mp3"
-tstbtc $mp3_link bitcointranscripts/stephan-livera-podcast --title 'SLP455 Anant Tapadia - Single Sig or Multi Sig?' --date '2023-02-01' --tags 'multisig' --speakers 'Anant Tapadia' --speakers 'Stephan Livera' --category 'podcast'
+tstbtc transcribe $mp3_link bitcointranscripts/stephan-livera-podcast --title 'SLP455 Anant Tapadia - Single Sig or Multi Sig?' --date '2023-02-01' --tags 'multisig' --speakers 'Anant Tapadia' --speakers 'Stephan Livera' --category 'podcast'
 ```
 
 ## Testing
