@@ -111,7 +111,7 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error from assigning source: {e}")
 
-    def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, chapters=None, nocheck=False):
+    def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, link=None, chapters=None, nocheck=False):
         """Add a source for transcription"""
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
@@ -121,7 +121,7 @@ class Transcription:
         # initialize source
         source = self._initialize_source(
             source=Source(source_file, loc, local, title, date,
-                          tags, category, speakers, preprocess),
+                          tags, category, speakers, preprocess, link),
             youtube_metadata=youtube_metadata,
             chapters=chapters)
         self.logger.info(f"Detected source: {source}")
@@ -157,7 +157,7 @@ class Transcription:
                 payload["content"]["date"] = transcript.source.event_date if type(
                     transcript.source.event_date) is str else transcript.source.event_date.strftime("%Y-%m-%d")
             if not transcript.source.local:
-                payload["content"]["media"] = transcript.source.source_file
+                payload["content"]["media"] = transcript.source.media
             return payload
 
         try:

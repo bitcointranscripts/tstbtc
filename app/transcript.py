@@ -189,23 +189,27 @@ class Transcript:
 
 
 class Source:
-    def __init__(self, source_file, loc, local, title, date, tags, category, speakers, preprocess):
+    def __init__(self, source_file, loc, local, title, date, tags, category, speakers, preprocess, link=None):
         # initialize source with arguments
-        self.save_source(source_file, loc, local, title, date,
-                         tags, category, speakers, preprocess)
+        self.save_source(source_file=source_file, loc=loc, local=local, title=title, tags=tags,
+                         category=category, speakers=speakers, preprocess=preprocess, link=link)
         self.__config_event_date(date)
         self.logger = get_logger()
 
-    def save_source(self, source_file, loc, local, title, date, tags, category, speakers, preprocess):
+    def save_source(self, source_file, loc, local, title, tags, category, speakers, preprocess, link):
         self.source_file = source_file
+        self.link = link  # the url that will be used as `media` for the transcript. It contains more metadata than just the audio download link
         self.loc = loc.strip("/")
         self.local = local
         self.title = title
         self.tags = tags
         self.category = category
         self.speakers = speakers
-        self.logger = get_logger()
         self.preprocess = preprocess
+
+    @property
+    def media(self):
+        return self.link if self.link is not None else self.source_file
 
     def __config_event_date(self, date):
         self.event_date = None
@@ -233,8 +237,8 @@ class Audio(Source):
     def __init__(self, source):
         try:
             # initialize source using a base Source
-            super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
-                             source.tags, source.category, source.speakers, source.preprocess)
+            super().__init__(source_file=source.source_file, link=source.link, loc=source.loc, local=source.local, title=source.title,
+                             date=source.event_date, tags=source.tags, category=source.category, speakers=source.speakers, preprocess=source.preprocess)
             self.type = "audio"
             self.__config_source()
         except Exception as e:
@@ -300,8 +304,8 @@ class Video(Source):
     def __init__(self, source, youtube_metadata=None, chapters=None):
         try:
             # initialize source using a base Source
-            super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
-                             source.tags, source.category, source.speakers, source.preprocess)
+            super().__init__(source_file=source.source_file, link=source.link, loc=source.loc, local=source.local, title=source.title,
+                             date=source.event_date, tags=source.tags, category=source.category, speakers=source.speakers, preprocess=source.preprocess)
             self.type = "video"
             self.youtube_metadata = youtube_metadata
             self.chapters = chapters
