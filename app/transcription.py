@@ -14,7 +14,7 @@ import yt_dlp
 
 from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
 from app import __app_name__, __version__, application
-from app.utils import write_to_json
+from app.utils import write_to_json, get_existing_media
 from app.logging import get_logger
 
 
@@ -35,6 +35,7 @@ class Transcription:
         self.queue = queue if not test_mode else False
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
+        self.existing_media = None
         self.test_mode = test_mode
         self.logger = get_logger()
         self.tmp_dir = working_dir if working_dir is not None else tempfile.mkdtemp()
@@ -113,13 +114,19 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error from assigning source: {e}")
 
-    def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, link=None, chapters=None, nocheck=False):
+    def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, link=None, chapters=None, nocheck=False, excluded_media=[]):
         """Add a source for transcription"""
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
         local = False
         if os.path.isfile(source_file):
             local = True
+        if not nocheck and not local and self.existing_media is None and not self.test_mode:
+            self.existing_media = get_existing_media()
+        # combine existing media from btctranscripts.com with excluded media given from source
+        excluded_media = {value: True for value in excluded_media}
+        if self.existing_media is not None:
+            excluded_media.update(self.existing_media)
         # initialize source
         source = self._initialize_source(
             source=Source(source_file, loc, local, title, date,
@@ -130,18 +137,32 @@ class Transcription:
         if source.type == "playlist":
             # add a transcript for each source/video in the playlist
             for video in source.videos:
-                transcription_sources['added'].append(video)
-                self.transcripts.append(Transcript(video, self.test_mode))
+                if video.media not in excluded_media:
+                    transcription_sources['added'].append(video)
+                    self.transcripts.append(Transcript(video, self.test_mode))
+                else:
+                    transcription_sources['exist'].append(video)
         elif source.type == 'rss':
             # add a transcript for each source/audio in the rss feed
             for entry in source.entries:
-                transcription_sources['added'].append(entry)
-                self.transcripts.append(Transcript(entry, self.test_mode))
+                if entry.media not in excluded_media:
+                    transcription_sources['added'].append(entry)
+                    self.transcripts.append(Transcript(entry, self.test_mode))
+                else:
+                    transcription_sources['exist'].append(entry)
         elif source.type in ['audio', 'video']:
-            transcription_sources['added'].append(source)
-            self.transcripts.append(Transcript(source, self.test_mode))
+            if source.media not in excluded_media:
+                transcription_sources['added'].append(source)
+                self.transcripts.append(Transcript(source, self.test_mode))
+                self.logger.info(f"Source added for transcription: {source.title}")
+            else:
+                transcription_sources['exist'].append(source)
+                self.logger.info(f"Source already exists: {source.title}")
         else:
             raise Exception(f"Invalid source: {source_file}")
+        if source.type in ['playlist', 'rss']:
+            self.logger.info(
+                f"{source.title}: sources added for transcription: {len(transcription_sources['added'])} (Ignored: {len(transcription_sources['exist'])} sources)")
         return transcription_sources
 
     def push_to_queue(self, transcript: Transcript, payload=None):
