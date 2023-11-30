@@ -114,8 +114,20 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error from assigning source: {e}")
 
+    def _new_transcript_from_source(self, source: Source):
+        """Helper method to initialize a new Transcript from source"""
+        self.transcripts.append(Transcript(source, self.test_mode))
+        # Save preprocessed source
+        if source.preprocess:
+            write_to_json(
+                source.to_json(),
+                f"{self.model_output_dir}/{source.loc}",
+                f"{source.title}_preprocess", is_metadata=True
+            )
+
     def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, link=None, chapters=None, nocheck=False, excluded_media=[]):
         """Add a source for transcription"""
+        preprocess = False if self.test_mode else preprocess
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
         local = False
@@ -139,7 +151,7 @@ class Transcription:
             for video in source.videos:
                 if video.media not in excluded_media:
                     transcription_sources['added'].append(video)
-                    self.transcripts.append(Transcript(video, self.test_mode))
+                    self._new_transcript_from_source(video)
                 else:
                     transcription_sources['exist'].append(video)
         elif source.type == 'rss':
@@ -147,14 +159,15 @@ class Transcription:
             for entry in source.entries:
                 if entry.media not in excluded_media:
                     transcription_sources['added'].append(entry)
-                    self.transcripts.append(Transcript(entry, self.test_mode))
+                    self._new_transcript_from_source(entry)
                 else:
                     transcription_sources['exist'].append(entry)
         elif source.type in ['audio', 'video']:
             if source.media not in excluded_media:
                 transcription_sources['added'].append(source)
-                self.transcripts.append(Transcript(source, self.test_mode))
-                self.logger.info(f"Source added for transcription: {source.title}")
+                self._new_transcript_from_source(source)
+                self.logger.info(
+                    f"Source added for transcription: {source.title}")
             else:
                 transcription_sources['exist'].append(source)
                 self.logger.info(f"Source already exists: {source.title}")
@@ -181,9 +194,8 @@ class Transcription:
                 }
             }
             # Handle optional metadata fields
-            if transcript.source.event_date:
-                payload["content"]["date"] = transcript.source.event_date if type(
-                    transcript.source.event_date) is str else transcript.source.event_date.strftime("%Y-%m-%d")
+            if transcript.source.date:
+                payload["content"]["date"] = transcript.source.date
             if not transcript.source.local:
                 payload["content"]["media"] = transcript.source.media
             return payload

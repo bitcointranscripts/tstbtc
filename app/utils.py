@@ -14,7 +14,10 @@ def slugify(text):
     return re.sub(r'\W+', '-', text).strip('-').lower()
 
 
-def write_to_json(json_data, output_dir, filename, add_timestamp=True):
+def write_to_json(json_data, output_dir, filename, add_timestamp=True, is_metadata=False):
+    if is_metadata:
+        # subdirectory for metadata
+        output_dir = os.path.join(output_dir, "metadata")
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
     time_in_str = f'_{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}' if add_timestamp else ""

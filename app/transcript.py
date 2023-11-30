@@ -212,6 +212,15 @@ class Source:
     def media(self):
         return self.link if self.link is not None else self.source_file
 
+    @property
+    def date(self):
+        if self.event_date is None:
+            return None
+        if type(self.event_date) is str:
+            return self.event_date
+        else:
+            return self.event_date.strftime("%Y-%m-%d")
+
     def __config_event_date(self, date):
         self.event_date = None
         if date:
@@ -302,7 +311,7 @@ class Audio(Source):
             raise Exception(f"Error processing audio file: {e}")
 
     def to_json(self):
-        return {
+        json_data = {
             'type': self.type,
             'loc': self.loc,
             "source_file": self.source_file,
@@ -311,10 +320,14 @@ class Audio(Source):
             'categories': self.category,
             'tags': self.tags,
             'speakers': self.speakers,
-            'date': self.event_date.strftime("%Y-%m-%d"),
+            'date': self.date,
             'description': self.description,
             'chapters': self.chapters,
         }
+        if self.date:
+            json_data['date'] = self.date
+
+        return json_data
 
 
 class Video(Source):
@@ -435,7 +448,7 @@ class Video(Source):
             raise Exception(f"Error processing video file: {e}")
 
     def to_json(self):
-        return {
+        json_data = {
             'type': self.type,
             'loc': self.loc,
             "source_file": self.source_file,
@@ -443,10 +456,14 @@ class Video(Source):
             'categories': self.category,
             'tags': self.tags,
             'speakers': self.speakers,
-            'date': self.event_date.strftime("%Y-%m-%d"),
+            'date': self.date,
             'chapters': self.chapters,
             'youtube': self.youtube_metadata
         }
+        if self.date:
+            json_data['date'] = self.date
+
+        return json_data
 
 
 class Playlist(Source):
