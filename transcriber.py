@@ -1,6 +1,7 @@
 import json
 import logging
 import tempfile
+import traceback
 
 import click
 
@@ -8,7 +9,7 @@ from app import __app_name__, __version__, application
 from app.transcript import Transcript
 from app.transcription import Transcription
 from app.logging import configure_logger, get_logger
-from app.utils import check_if_valid_file_path, write_to_json
+from app.utils import check_if_valid_file_path, write_to_json, configure_metadata_given_from_JSON
 
 logger = get_logger()
 
@@ -138,6 +139,37 @@ verbose_logging = click.option(
     help="Supply this flag to enable verbose logging",
 )
 
+add_title = click.option(
+    "-t",
+    "--title",
+    type=str,
+    help="Add the title for the resulting transcript (required for audio files)",
+)
+add_date = click.option(
+    "-d",
+    "--date",
+    type=str,
+    help="Add the event date to transcript's metadata in format 'yyyy-mm-dd'",
+)
+add_tags = click.option(
+    "-T",
+    "--tags",
+    multiple=True,
+    help="Add a tag to transcript's metadata (can be used multiple times)",
+)
+add_speakers = click.option(
+    "-s",
+    "--speakers",
+    multiple=True,
+    help="Add a speaker to the transcript's metadata (can be used multiple times)",
+)
+add_category = click.option(
+    "-c",
+    "--category",
+    multiple=True,
+    help="Add a category to the transcript's metadata (can be used multiple times)",
+)
+
 
 @cli.command()
 @click.argument("source", nargs=1)
@@ -146,36 +178,11 @@ verbose_logging = click.option(
 @whisper
 @deepgram
 # Options for adding metadata
-@click.option(
-    "-t",
-    "--title",
-    type=str,
-    help="Add the title for the resulting transcript (required for audio files)",
-)
-@click.option(
-    "-d",
-    "--date",
-    type=str,
-    help="Add the event date to transcript's metadata in format 'yyyy-mm-dd'",
-)
-@click.option(
-    "-T",
-    "--tags",
-    multiple=True,
-    help="Add a tag to transcript's metadata (can be used multiple times)",
-)
-@click.option(
-    "-s",
-    "--speakers",
-    multiple=True,
-    help="Add a speaker to the transcript's metadata (can be used multiple times)",
-)
-@click.option(
-    "-c",
-    "--category",
-    multiple=True,
-    help="Add a category to the transcript's metadata (can be used multiple times)",
-)
+@add_title
+@add_date
+@add_tags
+@add_speakers
+@add_category
 # Options for configuring the transcription process
 @diarize
 @summarize
@@ -304,18 +311,18 @@ def transcribe_from_json(
             sources = json.load(file)
 
         for source in sources:
-            # Configure metadata given from JSON
-            speakers = source.get("speakers", [])
-            category = source.get("categories", [])
-            tags = source.get("tags", [])
-            loc = source.get("loc", "")
-            youtube_metadata = source.get("youtube", None)
+            metadata = configure_metadata_given_from_JSON(source)
             transcription.add_transcription_source(
-                source_file=source["source_file"], loc=loc,
-                title=source["title"], category=category, tags=tags,
-                speakers=speakers, date=source["date"],
-                youtube_metadata=youtube_metadata,
-                chapters=source["chapters"], link=source["media"]
+                source_file=metadata["source_file"],
+                loc=metadata["loc"],
+                title=metadata["title"],
+                category=metadata["category"],
+                tags=metadata["tags"],
+                speakers=metadata["speakers"],
+                date=metadata["date"],
+                youtube_metadata=metadata["youtube_metadata"],
+                chapters=metadata["chapters"],
+                link=metadata["media"],
             )
 
         transcription.start()
@@ -352,18 +359,15 @@ def preprocess_sources(json_file, nocheck):
         transcription_sources = []
         for source in sources:
             logger.info(f"Preprocessing {source['title']}: {source['source']}")
-            # Configure metadata given from source
-            speakers = source.get("speakers", [])
-            category = source.get("categories", [])
-            tags = source.get("tags", [])
-            loc = source.get("loc", "")
+            metadata = configure_metadata_given_from_JSON(source)
             excluded_media = source.get(
                 "existing_entries_not_covered_by_btctranscripts/status.json", [])
             excluded_media = [entry["media"] for entry in excluded_media]
             transcription_source = transcription.add_transcription_source(
-                source['source'], loc=loc, tags=tags, category=category,
-                speakers=speakers, nocheck=nocheck, preprocess=True,
-                excluded_media=excluded_media
+                metadata['source_file'], loc=metadata['loc'],
+                tags=metadata['tags'], category=metadata['category'],
+                speakers=metadata['speakers'], nocheck=nocheck,
+                preprocess=True, excluded_media=excluded_media
             )
             for transcription_source in transcription_source["added"]:
                 transcription_sources.append(transcription_source)
@@ -373,6 +377,63 @@ def preprocess_sources(json_file, nocheck):
     except Exception as e:
         logger.error(e)
         logger.info(f"Exited with error")
+
+
+@cli.command()
+@click.argument("deepgram_json_file", nargs=1)
+@click.argument("preprocess_json_file", nargs=1)
+@diarize
+def postprocess_deepgram_transcript(
+    deepgram_json_file,
+    preprocess_json_file,
+    diarize
+):
+    """Supply required metadata to postprocess a transcript.
+    """
+    try:
+        configure_logger(log_level=logging.INFO)
+        check_if_valid_file_path(deepgram_json_file)
+        check_if_valid_file_path(preprocess_json_file)
+        logger.info(f"Processing deepgram output from {deepgram_json_file}")
+        transcription = Transcription(queue=False)
+        with open(deepgram_json_file, "r") as outfile:
+            deepgram_output = json.load(outfile)
+            outfile.close()
+        with open(preprocess_json_file, "r") as outfile:
+            preprocess_output = json.load(outfile)
+            outfile.close()
+        metadata = configure_metadata_given_from_JSON(preprocess_output)
+        transcription.add_transcription_source(
+            source_file=metadata["source_file"],
+            loc=metadata["loc"],
+            title=metadata["title"],
+            category=metadata["category"],
+            tags=metadata["tags"],
+            speakers=metadata["speakers"],
+            date=metadata["date"],
+            youtube_metadata=metadata["youtube_metadata"],
+            chapters=metadata["chapters"],
+            link=metadata["media"],
+            preprocess=False
+        )
+        # Postprocess deepgram transcript
+        has_chapters = len(metadata["chapters"]) > 0
+        transcript_from_deepgram = transcription.transcripts[0]
+        transcript_from_deepgram.title = metadata["title"]
+        transcript_from_deepgram.result = application.get_deepgram_transcript(
+            deepgram_output, diarize)
+        if has_chapters:
+            if diarize:
+                transcript_from_deepgram.result = application.combine_deepgram_chapters_with_diarization(
+                    deepgram_data=deepgram_output, chapters=metadata["chapters"])
+            else:
+                transcript_from_deepgram.result = application.combine_deepgram_with_chapters(
+                    deepgram_data=deepgram_output, chapters=metadata["chapters"])
+
+        transcription.postprocess(transcript_from_deepgram)
+    except Exception as e:
+        logger.error(e)
+        traceback.print_exc()
 
 
 if __name__ == '__main__':

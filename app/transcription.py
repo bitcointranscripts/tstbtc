@@ -186,11 +186,11 @@ class Transcription:
                 output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
                 self.logger.info(
                     f"Processing source: {transcript.source.source_file}")
-                tmp_dir = self._create_subdirectory(
+                transcript.tmp_dir = self._create_subdirectory(
                     f"transcript{len(self.result) + 1}")
-                transcript.process_source(tmp_dir)
+                transcript.process_source(transcript.tmp_dir)
                 result = transcript.transcribe(
-                    tmp_dir,
+                    transcript.tmp_dir,
                     self.generate_chapters,
                     self.summarize_transcript,
                     self.service,
@@ -199,38 +199,48 @@ class Transcription:
                     output_dir,
                     test_transcript=test_transcript
                 )
-                if self.markdown:
-                    transcription_md_file = transcript.write_to_file(
-                        output_dir if not self.test_mode else tmp_dir,
-                        self.transcript_by)
-                    self.result.append(transcription_md_file)
-                else:
-                    self.result.append(result)
-                if self.open_pr:
-                    application.create_pr(
-                        absolute_path=transcription_md_file,
-                        loc=transcript.source.source_file,
-                        username=self.transcript_by,
-                        curr_time=str(round(time.time() * 1000)),
-                        title=transcript.title,
-                    )
-                else:
-                    transcript_json = transcript.to_json()
-                    transcript_json["transcript_by"] = f"{self.transcript_by} via TBTBTC v{__version__}"
-                    if self.queuer:
-                        self.queuer.push_to_queue(transcript_json)
-                    else:
-                        # store payload for the user to manually send it to the queuer
-                        payload_json_file = write_to_json(
-                            transcript_json,
-                            f"{self.model_output_dir}/{transcript.source.loc}",
-                            f"{transcript.title}_payload"
-                        )
-                        self.logger.info(
-                            f"Transcript not added to the queue, payload stored at: {payload_json_file}")
+                postprocessed_transcript = self.postprocess(transcript)
+                self.result.append(postprocessed_transcript)
+
             return self.result
         except Exception as e:
             raise Exception(f"Error with the transcription: {e}") from e
+
+    def postprocess(self, transcript: Transcript):
+        try:
+            result = transcript.result
+            output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
+            if self.markdown:
+                transcription_md_file = transcript.write_to_file(
+                    output_dir if not self.test_mode else transcript.tmp_dir,
+                    self.transcript_by)
+                result = transcription_md_file
+            if self.open_pr:
+                application.create_pr(
+                    absolute_path=transcription_md_file,
+                    loc=transcript.source.source_file,
+                    username=self.transcript_by,
+                    curr_time=str(round(time.time() * 1000)),
+                    title=transcript.title,
+                )
+            elif not self.test_mode:
+                transcript_json = transcript.to_json()
+                transcript_json["transcript_by"] = f"{self.transcript_by} via TBTBTC v{__version__}"
+                if self.queuer:
+                    return self.queuer.push_to_queue(transcript_json)
+                else:
+                    # store payload for the user to manually send it to the queuer
+                    payload_json_file = write_to_json(
+                        transcript_json,
+                        output_dir,
+                        f"{transcript.title}_payload"
+                    )
+                    self.logger.info(
+                        f"Transcript not added to the queue, payload stored at: {payload_json_file}")
+                    result = payload_json_file
+            return result
+        except Exception as e:
+                raise Exception(f"Error with postprocessing: {e}") from e
 
     def clean_up(self):
         self.logger.info("Cleaning up...")

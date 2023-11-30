@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 from datetime import datetime, date
@@ -17,7 +18,7 @@ from moviepy.editor import VideoFileClip
 
 from app import __app_name__, __version__, application
 from app.logging import get_logger
-from app.utils import slugify
+from app.utils import slugify, write_to_json
 
 logger = get_logger()
 
@@ -99,10 +100,18 @@ class Transcript:
             has_chapters = len(self.source.chapters) > 0
             self.result = None
             if service == "deepgram" or summarize_transcript:
+                # process mp3 using deepgram
                 deepgram_resp = application.process_mp3_deepgram(
                     self.audio_file, summarize_transcript, diarize)
+                # store deepgram output
+                deepgram_output_file_path = write_to_json(
+                    deepgram_resp, model_output_dir, self.title, is_metadata=True)
+                self.logger.info(
+                    f"(deepgram) Model stored at: {deepgram_output_file_path}")
+                if upload:
+                    application.upload_file_to_s3(deepgram_output_file_path)
                 self.result = application.get_deepgram_transcript(
-                    deepgram_resp, diarize, self.title, upload, model_output_dir)
+                    deepgram_resp, diarize)
 
                 if summarize_transcript:
                     self.summary = application.get_deepgram_summary(
@@ -462,11 +471,18 @@ class Video(Source):
         except Exception as e:
             raise Exception(f"Error processing video file: {e}")
 
+    def __str__(self):
+        excluded_fields = ['logger']
+        fields = {key: value for key, value in self.__dict__.items()
+                  if key not in excluded_fields}
+        return f"Video:{str(fields)}"
+
     def to_json(self):
         json_data = {
             'type': self.type,
             'loc': self.loc,
             "source_file": self.source_file,
+            "media": self.media,
             'title': self.title,
             'categories': self.category,
             'tags': self.tags,

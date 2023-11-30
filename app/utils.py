@@ -34,6 +34,28 @@ def check_if_valid_file_path(file_path):
         raise Exception(f"Not a valid file: {file_path}")
 
 
+def configure_metadata_given_from_JSON(source):
+    """Helper method that deals with missings fields from JSON
+    by assigning default values"""
+    try:
+        metadata = {}
+        # required in the JSON
+        metadata["source_file"] = source["source_file"]
+        metadata["title"] = source["title"]
+        # not required in the JSON
+        metadata["speakers"] = source.get("speakers", [])
+        metadata["category"] = source.get("categories", [])
+        metadata["tags"] = source.get("tags", [])
+        metadata["chapters"] = source.get("chapters", [])
+        metadata["loc"] = source.get("loc", "")
+        metadata["date"] = source.get("date", None)
+        metadata["youtube_metadata"] = source.get("youtube", None)
+        metadata["media"] = source.get("media", None)
+        return metadata
+    except KeyError as e:
+        raise Exception(f"Parsing JSON: {e} is required")
+
+
 def get_status():
     """Helper method to fetch and store status.json locally"""
     STATUS_FILE_PATH = "status.json"  # the file path for storing the status locally

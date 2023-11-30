@@ -25,7 +25,6 @@ from moviepy.editor import VideoFileClip
 from pytube.exceptions import PytubeError
 
 from app import __app_name__, __version__
-from app.utils import write_to_json
 from app.logging import get_logger
 
 logger = get_logger()
@@ -145,26 +144,9 @@ def combine_deepgram_chapters_with_diarization(deepgram_data, chapters):
         logger.error(e)
 
 
-def get_deepgram_transcript(deepgram_data, diarize, title, upload, model_output_dir):
+def get_deepgram_transcript(deepgram_data, diarize):
     logger = logging.getLogger(__app_name__)
-
-    def save_local_json(json_data, title, model_output_dir):
-        time_in_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        if not os.path.isdir(model_output_dir):
-            os.makedirs(model_output_dir)
-        file_path = os.path.join(
-            model_output_dir, title + "_" + time_in_str + ".json"
-        )
-        with open(file_path, "w") as json_file:
-            json.dump(json_data, json_file, indent=4)
-        logger.info(f"(deepgram) Model stored at: {file_path}")
-        return file_path
     try:
-        data_path = write_to_json(
-            deepgram_data, model_output_dir, title)
-        logger.info(f"(deepgram) Model stored at: {data_path}")
-        if upload:
-            upload_file_to_s3(data_path)
         if diarize:
             logger.info(f"(deepgram) Processing diarization...")
             para = ""
@@ -291,8 +273,7 @@ def combine_deepgram_with_chapters(deepgram_data, chapters):
 
         return result
     except Exception as e:
-        logger.error("Error combining deepgram with chapters")
-        logger.error(e)
+        raise Exception(f"Error combining deepgram with chapters: {e}")
 
 
 def clean_up(tmp_dir):
