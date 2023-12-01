@@ -188,6 +188,21 @@ class Transcript:
         fields['source'] = str(self.source)
         return f"Transcript:{str(fields)}"
 
+    def to_json(self):
+        json_data = {
+            "title": self.title,
+            "categories": self.source.category,
+            "tags": self.source.tags,
+            "speakers": self.source.speakers,
+            "loc": self.source.loc,
+            "body": self.result,
+            "media": self.source.media
+        }
+        if self.source.date:
+            json_data['date'] = self.source.date
+
+        return json_data
+
 
 class Source:
     def __init__(self, source_file, loc, local, title, date, tags, category, speakers, preprocess, link=None):

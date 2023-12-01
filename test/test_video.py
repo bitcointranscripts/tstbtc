@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from app import application
+from app import application, __version__
 from app.transcription import Transcription
 
 
@@ -222,13 +222,16 @@ def test_generate_payload():
     loc = "yada/yada"
 
     transcription = Transcription(
-        username="username",
         test_mode=True,
     )
     transcription.add_transcription_source(
         source_file=source, loc=loc, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcription.start(test_transcript=transcript)
-    payload = transcription.push_to_queue(transcription.transcripts[0])
+    transcript_json = transcription.transcripts[0].to_json()
+    transcript_json["transcript_by"] = f"{username} via TBTBTC v{__version__}"
+    payload = {
+        "content": transcript_json
+    }
     transcription.clean_up()
     with open(rel_path("testAssets/payload.json"), "r") as outfile:
         content = json.load(outfile)

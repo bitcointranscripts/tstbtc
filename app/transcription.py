@@ -16,6 +16,7 @@ from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
 from app import __app_name__, __version__, application
 from app.utils import write_to_json, get_existing_media
 from app.logging import get_logger
+from app.queuer import Queuer
 
 
 class Transcription:
@@ -32,7 +33,7 @@ class Transcription:
         self.transcripts = []
         self.nocleanup = nocleanup
         # during testing we do not have/need a queuer backend
-        self.queue = queue if not test_mode else False
+        self.queuer = Queuer(test_mode=test_mode) if queue is True else None
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
         self.existing_media = None
@@ -178,70 +179,6 @@ class Transcription:
                 f"{source.title}: sources added for transcription: {len(transcription_sources['added'])} (Ignored: {len(transcription_sources['exist'])} sources)")
         return transcription_sources
 
-    def push_to_queue(self, transcript: Transcript, payload=None):
-        """Push the resulting transcript to a Queuer backend"""
-        def construct_payload():
-            """Helper method to construct the payload for the request to the Queuer backend"""
-            payload = {
-                "content": {
-                    "title": transcript.title,
-                    "transcript_by": f"{self.transcript_by} via TBTBTC v{__version__}",
-                    "categories": transcript.source.category,
-                    "tags": transcript.source.tags,
-                    "speakers": transcript.source.speakers,
-                    "loc": transcript.source.loc,
-                    "body": transcript.result,
-                }
-            }
-            # Handle optional metadata fields
-            if transcript.source.date:
-                payload["content"]["date"] = transcript.source.date
-            if not transcript.source.local:
-                payload["content"]["media"] = transcript.source.media
-            return payload
-
-        try:
-            if payload is None:
-                # No payload has been given directly
-                payload = construct_payload()
-                # Check if the user opt-out from sending the payload to the Queuer
-                if not self.queue:
-                    # payload will not be send to the Queuer backend
-                    if self.test_mode:
-                        # queuer is disabled by default when testing but we still
-                        # return the payload to be used for testing purposes
-                        return payload
-                    else:
-                        # store payload in case the user wants to manually send it to the queuer
-                        payload_json_file = write_to_json(
-                            payload, f"{self.model_output_dir}/{transcript.source.loc}", f"{transcript.title}_payload")
-                        self.logger.info(
-                            f"Transcript not added to the queue, payload stored at: {payload_json_file}")
-                        return payload_json_file
-            # Push the payload with the resulting transcript to the Queuer backend
-            config = dotenv_values(".env")
-            if "QUEUE_ENDPOINT" not in config:
-                raise Exception(
-                    "To push to a queue you need to define a 'QUEUE_ENDPOINT' in your .env file")
-            if "BEARER_TOKEN" not in config:
-                raise Exception(
-                    "To push to a queue you need to define a 'BEARER_TOKEN' in your .env file")
-            url = config["QUEUE_ENDPOINT"] + "/api/transcripts"
-            headers = {
-                'Authorization': f'Bearer {config["BEARER_TOKEN"]}',
-                'Content-Type': 'application/json'
-            }
-            response = requests.post(url, json=payload, headers=headers)
-            if response.status_code == 200:
-                self.logger.info(
-                    f"Transcript added to queue with id={response.json()['id']}")
-            else:
-                self.logger.error(
-                    f"Transcript not added to queue: ({response.status_code}) {response.text}")
-            return response
-        except Exception as e:
-            self.logger.error(f"Transcript not added to queue: {e}")
-
     def start(self, test_transcript=None):
         self.result = []
         try:
@@ -278,7 +215,19 @@ class Transcription:
                         title=transcript.title,
                     )
                 else:
-                    self.push_to_queue(transcript)
+                    transcript_json = transcript.to_json()
+                    transcript_json["transcript_by"] = f"{self.transcript_by} via TBTBTC v{__version__}"
+                    if self.queuer:
+                        self.queuer.push_to_queue(transcript_json)
+                    else:
+                        # store payload for the user to manually send it to the queuer
+                        payload_json_file = write_to_json(
+                            transcript_json,
+                            f"{self.model_output_dir}/{transcript.source.loc}",
+                            f"{transcript.title}_payload"
+                        )
+                        self.logger.info(
+                            f"Transcript not added to the queue, payload stored at: {payload_json_file}")
             return self.result
         except Exception as e:
             raise Exception(f"Error with the transcription: {e}") from e
