@@ -29,6 +29,15 @@ def write_to_json(json_data, output_dir, filename, add_timestamp=True, is_metada
     return file_path
 
 
+def check_if_valid_json(file_path):
+    try:
+        with open(file_path) as file:
+            json_content = json.load(file)
+        return json_content
+    except Exception as e:
+        raise Exception(f"Not a valid JSON file: {file_path}")
+
+
 def check_if_valid_file_path(file_path):
     if not isinstance(file_path, str) or not os.path.isfile(file_path):
         raise Exception(f"Not a valid file: {file_path}")
@@ -41,8 +50,8 @@ def configure_metadata_given_from_JSON(source):
         metadata = {}
         # required in the JSON
         metadata["source_file"] = source["source_file"]
-        metadata["title"] = source["title"]
         # not required in the JSON
+        metadata["title"] = source.get("title", "no-title")
         metadata["speakers"] = source.get("speakers", [])
         metadata["category"] = source.get("categories", [])
         metadata["tags"] = source.get("tags", [])
@@ -51,6 +60,10 @@ def configure_metadata_given_from_JSON(source):
         metadata["date"] = source.get("date", None)
         metadata["youtube_metadata"] = source.get("youtube", None)
         metadata["media"] = source.get("media", None)
+        excluded_media = source.get(
+            "existing_entries_not_covered_by_btctranscripts/status.json", [])
+        metadata["excluded_media"] = [entry["media"]
+                                      for entry in excluded_media]
         return metadata
     except KeyError as e:
         raise Exception(f"Parsing JSON: {e} is required")

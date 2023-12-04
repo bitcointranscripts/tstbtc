@@ -79,20 +79,20 @@ To check the version:
 
 ## Usage
 
-`tstbtc transcribe {source_file/url} {directory}` transcribe the given source
+`tstbtc transcribe {source_file/url}` transcribe the given source
 
 Suported sources:
-  - YouTube videos
-  - YouTube playlists
+  - YouTube videos and playlists
   - Local and remote audio files
+  - JSON files containing individual sources
 
 Note:
-- The `directory` is the bitcointranscripts directory that you want to associate the transcript with
 - The https links need to be wrapped in quotes when running the command on zsh
 
 To include optional metadata in your transcript, you can add the following
 parameters:
 
+- `--loc`: Add the location in the bitcointranscripts hierarchy that you want to associate the transcript [default: "misc"]
 - `-t` or `--title`: Add the title for the resulting transcript (required for audio files)
 - `-d` or `--date`: Add the event date to transcript's metadata in format 'yyyy-mm-dd'
 - can be used multiple times:
@@ -120,13 +120,13 @@ from Stephan Livera's podcast and add the associated metadata, we would run eith
 of the below commands. The first uses short argument tags, while the second uses
 long argument tags. The result is the same.
 
-- `tstbtc transcribe Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast -t 'OP_Vault - A New Way to HODL?' -d '2023-01-30' -T 'script' -T 'op_vault' -s 'James O’Beirne' -s 'Stephan Livera' -c ‘podcast’`
-- `tstbtc transcribe Nq6WxJ0PgJ4 bitcointranscripts/stephan-livera-podcast --title 'OP_Vault - A New Way to HODL?' --date '2023-01-30' --tags 'script' --tags 'op_vault' --speakers 'James O’Beirne' --speakers 'Stephan Livera' --category ‘podcast’`
+- `tstbtc transcribe Nq6WxJ0PgJ4 --loc "stephan-livera-podcast" -t 'OP_Vault - A New Way to HODL?' -d '2023-01-30' -T 'script' -T 'op_vault' -s 'James O’Beirne' -s 'Stephan Livera' -c ‘podcast’`
+- `tstbtc transcribe Nq6WxJ0PgJ4 --loc "stephan-livera-podcast" --title 'OP_Vault - A New Way to HODL?' --date '2023-01-30' --tags 'script' --tags 'op_vault' --speakers 'James O’Beirne' --speakers 'Stephan Livera' --category ‘podcast’`
 
 You can also transcribe a remote audio/mp3 link, such as the following from Stephan Livera's podcast: 
 ```shell
 mp3_link="https://anchor.fm/s/7d083a4/podcast/play/64348045/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2023-1-1%2Ff7fafb12-9441-7d85-d557-e9e5d18ab788.mp3"
-tstbtc transcribe $mp3_link bitcointranscripts/stephan-livera-podcast --title 'SLP455 Anant Tapadia - Single Sig or Multi Sig?' --date '2023-02-01' --tags 'multisig' --speakers 'Anant Tapadia' --speakers 'Stephan Livera' --category 'podcast'
+tstbtc transcribe $mp3_link --loc "stephan-livera-podcast" --title 'SLP455 Anant Tapadia - Single Sig or Multi Sig?' --date '2023-02-01' --tags 'multisig' --speakers 'Anant Tapadia' --speakers 'Stephan Livera' --category 'podcast'
 ```
 
 ## Testing

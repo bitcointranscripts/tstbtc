@@ -14,7 +14,13 @@ import yt_dlp
 
 from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
 from app import __app_name__, __version__, application
-from app.utils import write_to_json, get_existing_media
+from app.utils import (
+    check_if_valid_file_path,
+    check_if_valid_json,
+    configure_metadata_given_from_JSON,
+    get_existing_media,
+    write_to_json
+)
 from app.logging import get_logger
 from app.queuer import Queuer
 
@@ -178,6 +184,34 @@ class Transcription:
             self.logger.info(
                 f"{source.title}: sources added for transcription: {len(transcription_sources['added'])} (Ignored: {len(transcription_sources['exist'])} sources)")
         return transcription_sources
+
+    def add_transcription_source_JSON(self, json_file):
+        # validation checks
+        check_if_valid_file_path(json_file)
+        sources = check_if_valid_json(json_file)
+
+        # Check if JSON contains multiple sources
+        if not isinstance(sources, list):
+            # Initialize an array with 'sources' as the only element
+            sources = [sources]
+
+        self.logger.info(f"Adding transcripts from {json_file}")
+        for source in sources:
+            metadata = configure_metadata_given_from_JSON(source)
+
+            self.add_transcription_source(
+                source_file=metadata["source_file"],
+                loc=metadata["loc"],
+                title=metadata["title"],
+                category=metadata["category"],
+                tags=metadata["tags"],
+                speakers=metadata["speakers"],
+                date=metadata["date"],
+                youtube_metadata=metadata["youtube_metadata"],
+                chapters=metadata["chapters"],
+                link=metadata["media"],
+                excluded_media=metadata["excluded_media"]
+            )
 
     def start(self, test_transcript=None):
         self.result = []
