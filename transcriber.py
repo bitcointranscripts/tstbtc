@@ -269,44 +269,68 @@ def transcribe(
 
 
 @cli.command()
-@click.argument("json_file", nargs=1)
+@click.argument("source", nargs=1)
 @click.option(
     "--nocheck",
     is_flag=True,
     default=False,
     help="Do not check for existing sources using btctranscripts.com/status.json",
 )
-def preprocess_sources(json_file, nocheck):
-    """Supply sources in a JSON file for preprocess. Preprocessing will fetch
-    all the given sources, and output them in a JSON alongside the available
-    metadata. The JSON can then be edited and piped to `transcribe-from-json`
+@click.option(
+    "--no-batched-output",
+    is_flag=True,
+    default=False,
+    help="Output preprocessing output in a different JSON file for each source",
+)
+# Options for adding metadata
+@add_title
+@add_date
+@add_tags
+@add_speakers
+@add_category
+@add_loc
+def preprocess(
+    source: str,
+    loc: str,
+    title: str,
+    date: str,
+    tags: list,
+    speakers: list,
+    category: list,
+    nocheck: bool,
+    no_batched_output: bool
+):
+    """Preprocess the provided sources. Suported sources include: \n
+    - YouTube videos and playlists\n
+    - JSON files containing individual sources\n
+
+    Preprocessing will fetch all the given sources, and output them
+    in a JSON alongside the available metadata.
+    The JSON can then be edited and piped to `transcribe`
     """
     try:
         configure_logger(log_level=logging.INFO)
-        check_if_valid_file_path(json_file)
-        transcription = Transcription()
-        with open(json_file, "r") as outfile:
-            sources = json.load(outfile)
-            outfile.close()
-        logger.info(f"Sources detected: {len(sources)}")
-        transcription_sources = []
-        for source in sources:
-            logger.info(f"Preprocessing {source['title']}: {source['source']}")
-            metadata = configure_metadata_given_from_JSON(source)
-            excluded_media = source.get(
-                "existing_entries_not_covered_by_btctranscripts/status.json", [])
-            excluded_media = [entry["media"] for entry in excluded_media]
-            transcription_source = transcription.add_transcription_source(
-                metadata['source_file'], loc=metadata['loc'],
-                tags=metadata['tags'], category=metadata['category'],
-                speakers=metadata['speakers'], nocheck=nocheck,
-                preprocess=True, excluded_media=excluded_media
+        logger.info(f"Preprocessing sources...")
+        transcription = Transcription(
+            batch_preprocessing_output=not no_batched_output)
+        if source.endswith(".json"):
+            transcription.add_transcription_source_JSON(source, nocheck=nocheck)
+        else:
+            transcription.add_transcription_source(
+                source_file=source,
+                loc=loc,
+                title=title,
+                date=date,
+                tags=tags,
+                category=category,
+                speakers=speakers,
+                preprocess=True,
+                nocheck=nocheck
             )
-            for transcription_source in transcription_source["added"]:
-                transcription_sources.append(transcription_source)
-        # Write all preprocessed sources to JSON
-        write_to_json([source.to_json() for source in transcription_sources],
-                      transcription.model_output_dir, "preprocessed_sources")
+        if not no_batched_output:
+            # Batch write all preprocessed sources to JSON
+            write_to_json([preprocessed_source for preprocessed_source in transcription.preprocessing_output],
+                          transcription.model_output_dir, "preprocessed_sources")
     except Exception as e:
         logger.error(e)
         logger.info(f"Exited with error")

@@ -26,7 +26,27 @@ from app.queuer import Queuer
 
 
 class Transcription:
-    def __init__(self, model="tiny", chapters=False, pr=False, summarize=False, deepgram=False, diarize=False, upload=False, model_output_dir="local_models/", nocleanup=False, queue=True, markdown=False, username=None, test_mode=False,  working_dir=None):
+    def __init__(
+        self,
+        model="tiny",
+        chapters=False,
+        pr=False,
+        summarize=False,
+        deepgram=False,
+        diarize=False,
+        upload=False,
+        model_output_dir="local_models/",
+        nocleanup=False,
+        queue=True,
+        markdown=False,
+        username=None,
+        test_mode=False,
+        working_dir=None,
+        batch_preprocessing_output=False
+    ):
+        self.logger = get_logger()
+        self.tmp_dir = working_dir if working_dir is not None else tempfile.mkdtemp()
+
         self.model = model
         self.transcript_by = "username" if test_mode else self.__get_username()
         self.generate_chapters = chapters
@@ -44,8 +64,7 @@ class Transcription:
         self.markdown = markdown or test_mode
         self.existing_media = None
         self.test_mode = test_mode
-        self.logger = get_logger()
-        self.tmp_dir = working_dir if working_dir is not None else tempfile.mkdtemp()
+        self.preprocessing_output = [] if batch_preprocessing_output else None
 
         self.logger.info(f"Temp directory: {self.tmp_dir}")
 
@@ -124,13 +143,18 @@ class Transcription:
     def _new_transcript_from_source(self, source: Source):
         """Helper method to initialize a new Transcript from source"""
         self.transcripts.append(Transcript(source, self.test_mode))
-        # Save preprocessed source
+
         if source.preprocess:
-            write_to_json(
-                source.to_json(),
-                f"{self.model_output_dir}/{source.loc}",
-                f"{source.title}_preprocess", is_metadata=True
-            )
+            if self.preprocessing_output is None:
+                # Save preprocessing output for each individual source
+                write_to_json(
+                    source.to_json(),
+                    f"{self.model_output_dir}/{source.loc}",
+                    f"{source.title}_preprocess", is_metadata=True
+                )
+            else:
+                # Keep preprocessing outputs for later use
+                self.preprocessing_output.append(source.to_json())
 
     def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, link=None, chapters=None, nocheck=False, excluded_media=[]):
         """Add a source for transcription"""
@@ -185,7 +209,7 @@ class Transcription:
                 f"{source.title}: sources added for transcription: {len(transcription_sources['added'])} (Ignored: {len(transcription_sources['exist'])} sources)")
         return transcription_sources
 
-    def add_transcription_source_JSON(self, json_file):
+    def add_transcription_source_JSON(self, json_file, nocheck=False):
         # validation checks
         check_if_valid_file_path(json_file)
         sources = check_if_valid_json(json_file)
@@ -210,7 +234,8 @@ class Transcription:
                 youtube_metadata=metadata["youtube_metadata"],
                 chapters=metadata["chapters"],
                 link=metadata["media"],
-                excluded_media=metadata["excluded_media"]
+                excluded_media=metadata["excluded_media"],
+                nocheck=nocheck
             )
 
     def start(self, test_transcript=None):

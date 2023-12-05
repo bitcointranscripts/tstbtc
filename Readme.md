@@ -9,15 +9,20 @@ This cli app transcribes audio and video for submission to the [bitcointranscrip
   - summarization `--summarize`
   - diarization `--diarize`
 
-**Features**:
+**Transcription Workflow**
 
-- Transcription using [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/)
-- Collection of video's metadata when sourcing from YouTube.
-- Open Pull Request on the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo for the resulting transcript.
-- Save the resulting transcript to a markdown format supported by bitcointranscripts.
-- Upload the resulting transcript to an AWS S3 Bucket
-repo.
-- Push the resulting transcript to [a Queuer backend](https://github.com/bitcointranscripts/transcription-review-backend), or save the payload in a json for later use.
+This transcription tool operates through a structured four-stage process:
+
+1. Preprocess: Gathers all the available metadata for each source (supports YouTube videos&playlists, and RSS feeds)
+2. Process: Downloads and converts sources for transcription preparation
+3. Transcription: Utilizes [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/) to generate transcripts from MP3 files.
+4. Postprocess: Offers multiple options for further actions:
+    - **Pull Request**: Opens a PR on the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo for the resulting transcript.
+    - **Markdown**: Saves transcripts in a markdown format supported by bitcointranscripts.
+    - **Upload**: Saves transcripts in an AWS S3 Bucket.
+    - **Push to Queuer backend**: Sends transcripts to [a Queuer backend](https://github.com/bitcointranscripts/transcription-review-backend).
+    - **Save as JSON**: Preserves transcripts for future use.
+
 
 ## Prerequisites
 
