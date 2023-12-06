@@ -172,7 +172,6 @@ def test_video_with_chapters():
 
     transcription = Transcription(
         username=username,
-        chapters=True,
         test_mode=True,
     )
     transcription.add_transcription_source(

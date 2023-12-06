@@ -15,7 +15,15 @@ This transcription tool operates through a structured four-stage process:
 
 1. Preprocess: Gathers all the available metadata for each source (supports YouTube videos&playlists, and RSS feeds)
 2. Process: Downloads and converts sources for transcription preparation
-3. Transcription: Utilizes [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/) to generate transcripts from MP3 files.
+3. Transcription: Utilizes [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/) to generate transcripts.
+    1. Converts audio to text.
+        - Preserves raw wisper transcript in SRT
+        - Preserves raw deepgram output in JSON
+    2. Summarize: Generates a summary of the transcript. [only available with deepgram]
+    3. Upload: Saves raw transcript files in an AWS S3 Bucket [optional]
+    4. Constructs the resulting transcript.
+        - Process diarization. [deepgram only]
+        - Process chapters.
 4. Postprocess: Offers multiple options for further actions:
     - **Pull Request**: Opens a PR on the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo for the resulting transcript.
     - **Markdown**: Saves transcripts in a markdown format supported by bitcointranscripts.

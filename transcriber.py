@@ -84,13 +84,6 @@ summarize = click.option(
     default=False,
     help="Summarize the transcript [only available with deepgram]",
 )
-use_youtube_chapters = click.option(
-    "-C",
-    "--chapters",
-    is_flag=True,
-    default=False,
-    help="For YouTube videos, include the YouTube chapters and timestamps in the resulting transcript.",
-)
 open_pr = click.option(
     "-p",
     "--PR",
@@ -191,7 +184,6 @@ add_category = click.option(
 # Options for configuring the transcription process
 @diarize
 @summarize
-@use_youtube_chapters
 @open_pr
 @upload_to_s3
 @save_to_markdown
@@ -208,7 +200,6 @@ def transcribe(
     tags: list,
     speakers: list,
     category: list,
-    chapters: bool,
     pr: bool,
     deepgram: bool,
     summarize: bool,
@@ -240,7 +231,6 @@ def transcribe(
     try:
         transcription = Transcription(
             model=model,
-            chapters=chapters,
             pr=pr,
             summarize=summarize,
             deepgram=deepgram,
@@ -332,8 +322,7 @@ def preprocess(
             write_to_json([preprocessed_source for preprocessed_source in transcription.preprocessing_output],
                           transcription.model_output_dir, "preprocessed_sources")
     except Exception as e:
-        logger.error(e)
-        logger.info(f"Exited with error")
+        logger.info(f"Exited with error: {e}")
 
 
 @cli.command()
@@ -352,7 +341,8 @@ def postprocess_deepgram_transcript(
         check_if_valid_file_path(deepgram_json_file)
         check_if_valid_file_path(preprocess_json_file)
         logger.info(f"Processing deepgram output from {deepgram_json_file}")
-        transcription = Transcription(queue=False)
+        transcription = Transcription(
+            deepgram=True, queue=False, diarize=diarize)
         with open(deepgram_json_file, "r") as outfile:
             deepgram_output = json.load(outfile)
             outfile.close()
@@ -373,20 +363,11 @@ def postprocess_deepgram_transcript(
             link=metadata["media"],
             preprocess=False
         )
-        # Postprocess deepgram transcript
-        has_chapters = len(metadata["chapters"]) > 0
+        # Process raw deepgram transcript
         transcript_from_deepgram = transcription.transcripts[0]
         transcript_from_deepgram.title = metadata["title"]
-        transcript_from_deepgram.result = application.get_deepgram_transcript(
-            deepgram_output, diarize)
-        if has_chapters:
-            if diarize:
-                transcript_from_deepgram.result = application.combine_deepgram_chapters_with_diarization(
-                    deepgram_data=deepgram_output, chapters=metadata["chapters"])
-            else:
-                transcript_from_deepgram.result = application.combine_deepgram_with_chapters(
-                    deepgram_data=deepgram_output, chapters=metadata["chapters"])
-
+        transcript_from_deepgram.result = transcription.service.construct_transcript(
+            deepgram_output, metadata["chapters"])
         transcription.postprocess(transcript_from_deepgram)
     except Exception as e:
         logger.error(e)

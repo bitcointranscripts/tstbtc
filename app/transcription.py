@@ -13,7 +13,12 @@ import requests
 import yt_dlp
 
 from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
-from app import __app_name__, __version__, application
+from app import (
+    __app_name__,
+    __version__,
+    application,
+    services
+)
 from app.utils import (
     check_if_valid_file_path,
     check_if_valid_json,
@@ -29,7 +34,6 @@ class Transcription:
     def __init__(
         self,
         model="tiny",
-        chapters=False,
         pr=False,
         summarize=False,
         deepgram=False,
@@ -47,14 +51,13 @@ class Transcription:
         self.logger = get_logger()
         self.tmp_dir = working_dir if working_dir is not None else tempfile.mkdtemp()
 
-        self.model = model
         self.transcript_by = "username" if test_mode else self.__get_username()
-        self.generate_chapters = chapters
         self.open_pr = pr
-        self.summarize_transcript = summarize
-        self.service = "deepgram" if deepgram else model
-        self.diarize = diarize
-        self.upload = upload
+        if deepgram:
+            self.service = services.Deepgram(
+                summarize, diarize, upload, model_output_dir)
+        else:
+            self.service = services.Whisper(model, upload, model_output_dir)
         self.model_output_dir = model_output_dir
         self.transcripts = []
         self.nocleanup = nocleanup
@@ -248,16 +251,10 @@ class Transcription:
                 transcript.tmp_dir = self._create_subdirectory(
                     f"transcript{len(self.result) + 1}")
                 transcript.process_source(transcript.tmp_dir)
-                result = transcript.transcribe(
-                    transcript.tmp_dir,
-                    self.generate_chapters,
-                    self.summarize_transcript,
-                    self.service,
-                    self.diarize,
-                    self.upload,
-                    output_dir,
-                    test_transcript=test_transcript
-                )
+                if self.test_mode:
+                    transcript.result = test_transcript if test_transcript is not None else "test-mode"
+                else:
+                    transcript = self.service.transcribe(transcript)
                 postprocessed_transcript = self.postprocess(transcript)
                 self.result.append(postprocessed_transcript)
 
@@ -299,7 +296,7 @@ class Transcription:
                     result = payload_json_file
             return result
         except Exception as e:
-                raise Exception(f"Error with postprocessing: {e}") from e
+            raise Exception(f"Error with postprocessing: {e}") from e
 
     def clean_up(self):
         self.logger.info("Cleaning up...")

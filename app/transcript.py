@@ -26,15 +26,9 @@ logger = get_logger()
 class Transcript:
     def __init__(self, source, test_mode=False):
         self.source = source
+        self.summary = None
         self.test_mode = test_mode
         self.logger = get_logger()
-
-    def create_transcript(self):
-        result = ""
-        for x in self.result:
-            result = result + x[2] + " "
-
-        return result
 
     def process_source(self, tmp_dir=None):
         tmp_dir = tmp_dir if tmp_dir is not None else tempfile.mkdtemp()
@@ -42,109 +36,6 @@ class Transcript:
         self.title = self.source.title if self.source.title else os.path.basename(
             self.audio_file)[:-4]
         return self.audio_file, tmp_dir
-
-    def transcribe(self, working_dir, generate_chapters, summarize_transcript, service, diarize, upload, model_output_dir, test_transcript=None):
-
-        def process_mp3():
-            """using whisper"""
-            self.logger.info("Transcribing audio to text using whisper ...")
-            try:
-                my_model = whisper.load_model(service)
-                result = my_model.transcribe(self.audio_file)
-                data = []
-                for x in result["segments"]:
-                    data.append(tuple((x["start"], x["end"], x["text"])))
-                data_path = application.generate_srt(
-                    data, self.title, model_output_dir)
-                if upload:
-                    application.upload_file_to_s3(data_path)
-                return data
-            except Exception as e:
-                self.logger.error(
-                    f"(wisper,{service}) Error transcribing audio to text: {e}")
-                return
-
-        def write_chapters_file():
-            """Write out the chapter file based on simple MP4 format (OGM)"""
-            try:
-                if generate_chapters and len(self.source.chapters) > 0:
-                    self.logger.info("Chapters detected")
-                    chapters_file = os.path.join(working_dir, os.path.basename(
-                        self.audio_file)[:-4] + ".chapters")
-
-                    with open(chapters_file, "w") as fo:
-                        for current_chapter in self.source.chapters:
-                            fo.write(
-                                f"CHAPTER{current_chapter[0]}="
-                                f"{current_chapter[1]}\n"
-                                f"CHAPTER{current_chapter[0]}NAME="
-                                f"{current_chapter[2]}\n"
-                            )
-                        fo.close()
-                    return True
-                else:
-                    return False
-            except Exception as e:
-                raise Exception(f"Error writing chapters file: {e}")
-
-        try:
-            self.summary = None
-            if self.test_mode:
-                self.result = test_transcript if test_transcript is not None else "test-mode"
-                return self.result
-            if not self.audio_file:
-                # TODO give audio file path as argument
-                raise Exception(
-                    "audio file is missing, you need to process_source() first")
-
-            has_chapters = len(self.source.chapters) > 0
-            self.result = None
-            if service == "deepgram" or summarize_transcript:
-                # process mp3 using deepgram
-                deepgram_resp = application.process_mp3_deepgram(
-                    self.audio_file, summarize_transcript, diarize)
-                # store deepgram output
-                deepgram_output_file_path = write_to_json(
-                    deepgram_resp, model_output_dir, self.title, is_metadata=True)
-                self.logger.info(
-                    f"(deepgram) Model stored at: {deepgram_output_file_path}")
-                if upload:
-                    application.upload_file_to_s3(deepgram_output_file_path)
-                self.result = application.get_deepgram_transcript(
-                    deepgram_resp, diarize)
-
-                if summarize_transcript:
-                    self.summary = application.get_deepgram_summary(
-                        deepgram_resp)
-
-                if service == "deepgram" and has_chapters:
-                    if diarize:
-                        self.result = application.combine_deepgram_chapters_with_diarization(
-                            deepgram_data=deepgram_resp, chapters=self.source.chapters
-                        )
-                    else:
-                        self.result = application.combine_deepgram_with_chapters(
-                            deepgram_data=deepgram_resp, chapters=self.source.chapters
-                        )
-
-            if not service == "deepgram":
-                # whisper
-                self.result = process_mp3()
-                if has_chapters:
-                    # this is only available for videos, for now
-                    self.result = application.combine_chapter(
-                        chapters=self.source.chapters,
-                        transcript=self.result,
-                        working_dir=working_dir
-                    )
-                else:
-                    # finalize transcript
-                    self.result = self.create_transcript()
-
-            return self.result
-
-        except Exception as e:
-            raise Exception(f"Error while transcribing audio source: {e}")
 
     def write_to_file(self, working_dir, transcript_by):
         """Writes transcript to a markdown file and returns its absolute path
