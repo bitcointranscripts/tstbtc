@@ -37,50 +37,6 @@ class Transcript:
             self.audio_file)[:-4]
         return self.audio_file, tmp_dir
 
-    def write_to_file(self, working_dir, transcript_by):
-        """Writes transcript to a markdown file and returns its absolute path
-        This file is submitted as part of the Pull Request to the 
-        bitcointranscripts repo
-        """
-
-        def process_metadata(key, value):
-            if value:
-                value = value.strip()
-                value = [item.strip() for item in value.split(",")]
-                return f"{key}: {value}\n"
-            return ""
-
-        self.logger.info("Creating markdown file with transcription...")
-        try:
-            # Add metadata prefix
-            meta_data = (
-                "---\n"
-                f"title: {self.title}\n"
-                f"transcript_by: {transcript_by} via TBTBTC v{__version__}\n"
-            )
-            if not self.source.local:
-                meta_data += f"media: {self.source.source_file}\n"
-            meta_data += process_metadata("tags", self.source.tags)
-            meta_data += process_metadata("speakers", self.source.speakers)
-            meta_data += process_metadata("categories",
-                                          self.source.category)
-            if self.summary:
-                meta_data += f"summary: {self.summary}\n"
-            if self.source.event_date:
-                meta_data += f"date: {self.source.event_date}\n"
-            meta_data += "---\n"
-            # Write to file
-            output_file = os.path.join(
-                working_dir, f"{slugify(self.title)}.md")
-            with open(output_file, "a") as opf:
-                opf.write(meta_data + "\n")
-                opf.write(self.result + "\n")
-                opf.close()
-            self.logger.info(f"Markdown file stored at: {output_file}")
-            return os.path.abspath(output_file)
-        except Exception as e:
-            self.logger.error(f"Error writing to file: {e}")
-
     def __str__(self):
         excluded_fields = ['test_mode', 'logger']
         fields = {key: value for key, value in self.__dict__.items()

@@ -17,14 +17,8 @@ from app import (
     __app_name__,
     __version__,
     application,
-    services
-)
-from app.utils import (
-    check_if_valid_file_path,
-    check_if_valid_json,
-    configure_metadata_given_from_JSON,
-    get_existing_media,
-    write_to_json
+    services,
+    utils
 )
 from app.logging import get_logger
 from app.queuer import Queuer
@@ -159,7 +153,22 @@ class Transcription:
                 # Keep preprocessing outputs for later use
                 self.preprocessing_output.append(source.to_json())
 
-    def add_transcription_source(self, source_file, loc="misc", title=None, date=None, tags=[], category=[], speakers=[], preprocess=True, youtube_metadata=None, link=None, chapters=None, nocheck=False, excluded_media=[]):
+    def add_transcription_source(
+        self,
+        source_file,
+        loc="misc",
+        title=None,
+        date=None,
+        tags=[],
+        category=[],
+        speakers=[],
+        preprocess=True,
+        youtube_metadata=None,
+        link=None,
+        chapters=None,
+        nocheck=False,
+        excluded_media=[]
+    ):
         """Add a source for transcription"""
         preprocess = False if self.test_mode else preprocess
         transcription_sources = {"added": [], "exist": []}
@@ -168,7 +177,7 @@ class Transcription:
         if os.path.isfile(source_file):
             local = True
         if not nocheck and not local and self.existing_media is None and not self.test_mode:
-            self.existing_media = get_existing_media()
+            self.existing_media = utils.get_existing_media()
         # combine existing media from btctranscripts.com with excluded media given from source
         excluded_media = {value: True for value in excluded_media}
         if self.existing_media is not None:
@@ -214,8 +223,8 @@ class Transcription:
 
     def add_transcription_source_JSON(self, json_file, nocheck=False):
         # validation checks
-        check_if_valid_file_path(json_file)
-        sources = check_if_valid_json(json_file)
+        utils.check_if_valid_file_path(json_file)
+        sources = utils.check_if_valid_json(json_file)
 
         # Check if JSON contains multiple sources
         if not isinstance(sources, list):
@@ -224,7 +233,7 @@ class Transcription:
 
         self.logger.info(f"Adding transcripts from {json_file}")
         for source in sources:
-            metadata = configure_metadata_given_from_JSON(source)
+            metadata = utils.configure_metadata_given_from_JSON(source)
 
             self.add_transcription_source(
                 source_file=metadata["source_file"],
@@ -262,14 +271,61 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error with the transcription: {e}") from e
 
+    def write_to_markdown_file(self, transcript: Transcript, output_dir):
+        """Writes transcript to a markdown file and returns its absolute path
+        This file is the one submitted as part of the Pull Request to the
+        bitcointranscripts repo
+        """
+        self.logger.info("Creating markdown file with transcription...")
+        try:
+            # Add metadata prefix
+            meta_data = (
+                "---\n"
+                f"title: {transcript.title}\n"
+                f"transcript_by: {self.transcript_by} via TBTBTC v{__version__}\n"
+            )
+            if not transcript.source.local:
+                meta_data += f"media: {transcript.source.source_file}\n"
+            meta_data += f"tags: {transcript.source.tags}\n"
+            meta_data += f"speakers: {transcript.source.speakers}\n"
+            meta_data += f"categories: {transcript.source.category}\n"
+            if transcript.summary:
+                meta_data += f"summary: {transcript.summary}\n"
+            if transcript.source.event_date:
+                meta_data += f"date: {transcript.source.event_date}\n"
+            meta_data += "---\n"
+            # Write to file
+            markdown_file = f"{utils.configure_output_file_path(output_dir, transcript.title, add_timestamp=False)}.md"
+            with open(markdown_file, "a") as opf:
+                opf.write(meta_data + "\n")
+                opf.write(transcript.result + "\n")
+                opf.close()
+            self.logger.info(f"Markdown file stored at: {markdown_file}")
+            return os.path.abspath(markdown_file)
+        except Exception as e:
+            raise Exception(f"Error writing to file: {e}")
+
+    def write_to_json_file(self, transcript: Transcript):
+        self.logger.info("Creating JSON file with transcription...")
+        output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
+        transcript_json = transcript.to_json()
+        transcript_json["transcript_by"] = f"{self.transcript_by} via TBTBTC v{__version__}"
+        json_file = utils.write_to_json(
+            transcript_json,
+            output_dir,
+            f"{transcript.title}_payload"
+        )
+        self.logger.info(f"Transcription stored at {json_file}")
+        return json_file
+
     def postprocess(self, transcript: Transcript):
         try:
             result = transcript.result
             output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
             if self.markdown:
-                transcription_md_file = transcript.write_to_file(
-                    output_dir if not self.test_mode else transcript.tmp_dir,
-                    self.transcript_by)
+                transcription_md_file = self.write_to_markdown_file(
+                    transcript,
+                    output_dir if not self.test_mode else transcript.tmp_dir)
                 result = transcription_md_file
             if self.open_pr:
                 application.create_pr(
@@ -286,13 +342,7 @@ class Transcription:
                     return self.queuer.push_to_queue(transcript_json)
                 else:
                     # store payload for the user to manually send it to the queuer
-                    payload_json_file = write_to_json(
-                        transcript_json,
-                        output_dir,
-                        f"{transcript.title}_payload"
-                    )
-                    self.logger.info(
-                        f"Transcript not added to the queue, payload stored at: {payload_json_file}")
+                    payload_json_file = self.write_to_json_file(transcript)
                     result = payload_json_file
             return result
         except Exception as e:
