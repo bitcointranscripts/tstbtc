@@ -77,6 +77,14 @@ def configure_metadata_given_from_JSON(source):
             "existing_entries_not_covered_by_btctranscripts/status.json", [])
         metadata["excluded_media"] = [entry["media"]
                                       for entry in excluded_media]
+        # transcription service output
+        services = ["whisper", "deepgram"]
+        for service in services:
+            key = f"{service}_output"
+            metadata[key] = source.get(key, None)
+            if metadata[key] is not None:
+                check_if_valid_file_path(metadata[key])
+
         return metadata
     except KeyError as e:
         raise Exception(f"Parsing JSON: {e} is required")

@@ -17,11 +17,11 @@ This transcription tool operates through a structured four-stage process:
 2. Process: Downloads and converts sources for transcription preparation
 3. Transcription: Utilizes [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/) to generate transcripts.
     1. Converts audio to text.
-        - Preserves raw wisper transcript in SRT
-        - Preserves raw deepgram output in JSON
-    2. Summarize: Generates a summary of the transcript. [only available with deepgram]
-    3. Upload: Saves raw transcript files in an AWS S3 Bucket [optional]
-    4. Constructs the resulting transcript.
+        - Save as JSON: Preserves the output of the transcription service for future use.
+        - Save as SRT: Generates SRT file [whisper only]
+    2. Summarize: Generates a summary of the transcript. [deepgram only]
+    3. Upload: Saves transcription service output in an AWS S3 Bucket [optional]
+    4. Finalizes the resulting transcript.
         - Process diarization. [deepgram only]
         - Process chapters.
 4. Postprocess: Offers multiple options for further actions:

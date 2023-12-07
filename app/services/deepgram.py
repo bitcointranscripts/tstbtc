@@ -1,3 +1,4 @@
+import json
 import mimetypes
 
 import deepgram
@@ -45,14 +46,32 @@ class Deepgram:
         except Exception as e:
             raise Exception(f"(deepgram) Error transcribing audio to text: {e}")
 
-    def process_with_diarization_and_chapters(self, raw_transcript, chapters):
+    def write_to_json_file(self, transcription_service_output, transcript: Transcript):
+        transcription_service_output_file = utils.write_to_json(
+            transcription_service_output, f"{self.output_dir}/{transcript.source.loc}", transcript.title, is_metadata=True)
+        logger.info(
+            f"(deepgram) Model stored at: {transcription_service_output_file}")
+        # Add deepgram output file path to transcript's metadata file
+        if transcript.metadata_file is not None:
+            # Read existing content of the metadata file
+            with open(transcript.metadata_file, 'r') as file:
+                data = json.load(file)
+            # Add deepgram output
+            data['deepgram_output'] = transcription_service_output_file
+            # Write the updated dictionary back to the JSON file
+            with open(transcript.metadata_file, 'w') as file:
+                json.dump(data, file, indent=4)
+
+        return transcription_service_output_file
+
+    def process_with_diarization_and_chapters(self, transcription_service_output, chapters):
         logger.info(
             "(deepgram) Processing diarization with detected chapters...")
         try:
             para = ""
             string = ""
             curr_speaker = None
-            words = raw_transcript["results"]["channels"][0]["alternatives"][0][
+            words = transcription_service_output["results"]["channels"][0]["alternatives"][0][
                 "words"
             ]
             words_pointer = 0
@@ -102,12 +121,12 @@ class Deepgram:
         except Exception as e:
             raise Exception(f"Error combining deepgram chapters: {e}")
 
-    def process_with_diarization(self, raw_transcript):
+    def process_with_diarization(self, transcription_service_output):
         logger.info(f"(deepgram) Processing diarization...")
         para = ""
         string = ""
         curr_speaker = None
-        for word in raw_transcript["results"]["channels"][0]["alternatives"][0][
+        for word in transcription_service_output["results"]["channels"][0]["alternatives"][0][
             "words"
         ]:
             if word["speaker"] != curr_speaker:
@@ -127,13 +146,13 @@ class Deepgram:
         string = string + para
         return string
 
-    def process_with_chapters(self, raw_transcript, chapters):
+    def process_with_chapters(self, transcription_service_output, chapters):
         logger.info("(deepgram) Combining transcript with detected chapters...")
         try:
             chapters_pointer = 0
             words_pointer = 0
             result = ""
-            words = raw_transcript["results"]["channels"][0]["alternatives"][0][
+            words = transcription_service_output["results"]["channels"][0]["alternatives"][0][
                 "words"
             ]
             # chapters index, start time, name
@@ -163,9 +182,12 @@ class Deepgram:
         except Exception as e:
             raise Exception(f"Error combining deepgram with chapters: {e}")
 
-    def process_summary(self, raw_transcript):
+    def process_summary(self, transcript: Transcript):
+        with open(transcript.transcription_service_output_file, "r") as outfile:
+            transcription_service_output = json.load(outfile)
+
         try:
-            summaries = raw_transcript["results"]["channels"][0]["alternatives"][0][
+            summaries = transcription_service_output["results"]["channels"][0]["alternatives"][0][
                 "summaries"
             ]
             summary = ""
@@ -175,39 +197,48 @@ class Deepgram:
         except Exception as e:
             logger.error(f"Error getting summary: {e}")
 
-    def construct_transcript(self, raw_transcript, chapters):
-        if len(chapters) > 0:
-            # With chapters
-            if self.diarize:
-                # With diarization
-                return self.process_with_diarization_and_chapters(raw_transcript, chapters)
-            else:
-                # Without diarization
-                return self.process_with_chapters(raw_transcript, chapters)
-        else:
-            # Without chapters
-            if self.diarize:
-                # With diarization
-                return self.process_with_diarization(raw_transcript)
-            else:
-                # Without diarization
-                return raw_transcript["results"]["channels"][0]["alternatives"][0]["transcript"]
+    def finalize_transcript(self, transcript: Transcript):
+        try:
+            with open(transcript.transcription_service_output_file, "r") as outfile:
+                transcription_service_output = json.load(outfile)
 
-        return result
+            has_diarization = any(
+                'speaker' in word for word in transcription_service_output['results']['channels'][0]['alternatives'][0]['words'])
+            has_chapters = len(transcript.source.chapters) > 0
+
+            if has_chapters:
+                # With chapters
+                if has_diarization:
+                    # With diarization
+                    return self.process_with_diarization_and_chapters(transcription_service_output, chapters)
+                else:
+                    # Without diarization
+                    return self.process_with_chapters(transcription_service_output, transcript.source.chapters)
+            else:
+                # Without chapters
+                if has_diarization:
+                    # With diarization
+                    return self.process_with_diarization(transcription_service_output)
+                else:
+                    # Without diarization
+                    return transcription_service_output["results"]["channels"][0]["alternatives"][0]["transcript"]
+
+            return result
+        except Exception as e:
+            raise Exception(f"(deepgram) Error finalizing transcript: {e}")
 
     def transcribe(self, transcript: Transcript):
         try:
-            raw_transcript = self.audio_to_text(transcript.audio_file)
-            raw_transcript_file = utils.write_to_json(
-                raw_transcript, f"{self.output_dir}/{transcript.source.loc}", transcript.title, is_metadata=True)
-            logger.info(
-                f"(deepgram) Model stored at: {raw_transcript_file}")
+            transcription_service_output = self.audio_to_text(
+                transcript.audio_file)
+            transcript.transcription_service_output_file = self.write_to_json_file(
+                transcription_service_output, transcript)
             if self.upload:
-                application.upload_file_to_s3(raw_transcript_file)
+                application.upload_file_to_s3(
+                    transcript.transcription_service_output_file)
             if self.summarize:
-                transcript.summary = self.process_summary(raw_transcript)
-            transcript.result = self.construct_transcript(
-                raw_transcript, transcript.source.chapters)
+                transcript.summary = self.process_summary(transcript)
+            transcript.result = self.finalize_transcript(transcript)
 
             return transcript
         except Exception as e:

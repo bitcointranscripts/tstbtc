@@ -5,11 +5,15 @@ import traceback
 
 import click
 
-from app import __app_name__, __version__, application
+from app import (
+    __app_name__,
+    __version__,
+    application,
+    utils
+)
 from app.transcript import Transcript
 from app.transcription import Transcription
 from app.logging import configure_logger, get_logger
-from app.utils import check_if_valid_file_path, write_to_json, configure_metadata_given_from_JSON
 
 logger = get_logger()
 
@@ -174,6 +178,9 @@ add_category = click.option(
 # Available transcription models and services
 @whisper
 @deepgram
+# Available features for transcription services
+@diarize
+@summarize
 # Options for adding metadata
 @add_title
 @add_date
@@ -181,13 +188,12 @@ add_category = click.option(
 @add_speakers
 @add_category
 @add_loc
-# Options for configuring the transcription process
-@diarize
-@summarize
+# Options for configuring the transcription postprocess
 @open_pr
 @upload_to_s3
 @save_to_markdown
 @noqueue
+# Configuration options
 @model_output_dir
 @nocleanup
 @verbose_logging
@@ -319,37 +325,56 @@ def preprocess(
             )
         if not no_batched_output:
             # Batch write all preprocessed sources to JSON
-            write_to_json([preprocessed_source for preprocessed_source in transcription.preprocessing_output],
-                          transcription.model_output_dir, "preprocessed_sources")
+            utils.write_to_json([preprocessed_source for preprocessed_source in transcription.preprocessing_output],
+                                transcription.model_output_dir, "preprocessed_sources")
     except Exception as e:
         logger.info(f"Exited with error: {e}")
 
 
 @cli.command()
-@click.argument("deepgram_json_file", nargs=1)
-@click.argument("preprocess_json_file", nargs=1)
-@diarize
-def postprocess_deepgram_transcript(
-    deepgram_json_file,
-    preprocess_json_file,
-    diarize
+@click.argument(
+    "service",
+    nargs=1,
+    type=click.Choice(
+        [
+            "whisper",
+            "deepgram"
+        ]
+    )
+)
+@click.argument("metadata_json_file", nargs=1)
+# Options for configuring the transcription postprocess
+@open_pr
+@upload_to_s3
+@save_to_markdown
+@noqueue
+def postprocess(
+    metadata_json_file,
+    service,
+    pr: bool,
+    upload: bool,
+    markdown: bool,
+    noqueue: bool,
 ):
-    """Supply required metadata to postprocess a transcript.
+    """Postprocess the output of a transcription service.
+    Requires the metadata JSON file that is the output of the previous stage
+    of the transcription process.
     """
     try:
         configure_logger(log_level=logging.INFO)
-        check_if_valid_file_path(deepgram_json_file)
-        check_if_valid_file_path(preprocess_json_file)
-        logger.info(f"Processing deepgram output from {deepgram_json_file}")
+        utils.check_if_valid_file_path(metadata_json_file)
+        logger.info(
+            f"Postprocessing {service} transcript from {metadata_json_file}")
         transcription = Transcription(
-            deepgram=True, queue=False, diarize=diarize)
-        with open(deepgram_json_file, "r") as outfile:
-            deepgram_output = json.load(outfile)
-            outfile.close()
-        with open(preprocess_json_file, "r") as outfile:
-            preprocess_output = json.load(outfile)
-            outfile.close()
-        metadata = configure_metadata_given_from_JSON(preprocess_output)
+            deepgram=service == "deepgram",
+            pr=pr,
+            upload=upload,
+            markdown=markdown,
+            queue=not noqueue,
+        )
+        with open(metadata_json_file, "r") as outfile:
+            metadata_json = json.load(outfile)
+        metadata = utils.configure_metadata_given_from_JSON(metadata_json)
         transcription.add_transcription_source(
             source_file=metadata["source_file"],
             loc=metadata["loc"],
@@ -361,14 +386,16 @@ def postprocess_deepgram_transcript(
             youtube_metadata=metadata["youtube_metadata"],
             chapters=metadata["chapters"],
             link=metadata["media"],
-            preprocess=False
+            preprocess=False,
         )
-        # Process raw deepgram transcript
-        transcript_from_deepgram = transcription.transcripts[0]
-        transcript_from_deepgram.title = metadata["title"]
-        transcript_from_deepgram.result = transcription.service.construct_transcript(
-            deepgram_output, metadata["chapters"])
-        transcription.postprocess(transcript_from_deepgram)
+        # Finalize transcription service output
+        transcript_to_postprocess = transcription.transcripts[0]
+        transcript_to_postprocess.title = metadata["title"]
+        transcript_to_postprocess.transcription_service_output_file = metadata[
+            f"{service}_output"]
+        transcript_to_postprocess.result = transcription.service.finalize_transcript(
+            transcript_to_postprocess)
+        transcription.postprocess(transcript_to_postprocess)
     except Exception as e:
         logger.error(e)
         traceback.print_exc()

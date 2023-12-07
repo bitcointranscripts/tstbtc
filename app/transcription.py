@@ -118,7 +118,7 @@ class Transcription:
                 raise Exception(f"Invalid source: {e}")
         try:
             if source.source_file.endswith(".mp3") or source.source_file.endswith(".wav") or source.source_file.endswith(".m4a"):
-                return Audio(source=source)
+                return Audio(source=source, chapters=chapters)
             if source.source_file.endswith("rss") or source.source_file.endswith(".xml"):
                 return RSS(source=source)
 
@@ -139,19 +139,21 @@ class Transcription:
 
     def _new_transcript_from_source(self, source: Source):
         """Helper method to initialize a new Transcript from source"""
-        self.transcripts.append(Transcript(source, self.test_mode))
-
+        metadata_file = None
         if source.preprocess:
             if self.preprocessing_output is None:
                 # Save preprocessing output for each individual source
-                write_to_json(
+                metadata_file = utils.write_to_json(
                     source.to_json(),
                     f"{self.model_output_dir}/{source.loc}",
-                    f"{source.title}_preprocess", is_metadata=True
+                    f"{source.title}_metadata", is_metadata=True
                 )
             else:
                 # Keep preprocessing outputs for later use
                 self.preprocessing_output.append(source.to_json())
+        # Initialize new transcript from source
+        self.transcripts.append(Transcript(
+            source=source, test_mode=self.test_mode, metadata_file=metadata_file))
 
     def add_transcription_source(
         self,
