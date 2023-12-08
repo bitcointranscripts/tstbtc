@@ -36,9 +36,11 @@ class Transcript:
     def process_source(self, tmp_dir=None):
         tmp_dir = tmp_dir if tmp_dir is not None else tempfile.mkdtemp()
         self.audio_file = self.source.process(tmp_dir)
-        self.title = self.source.title if self.source.title else os.path.basename(
-            self.audio_file)[:-4]
         return self.audio_file, tmp_dir
+
+    @property
+    def title(self):
+        return self.source.title
 
     def __str__(self):
         excluded_fields = ['test_mode', 'logger']
@@ -55,8 +57,9 @@ class Transcript:
             "speakers": self.source.speakers,
             "loc": self.source.loc,
             "body": self.result,
-            "media": self.source.media
         }
+        if not self.source.local:
+            json_data["media"] = self.source.media
         if self.source.date:
             json_data['date'] = self.source.date
 
@@ -76,7 +79,8 @@ class Source:
         self.link = link  # the url that will be used as `media` for the transcript. It contains more metadata than just the audio download link
         self.loc = loc.strip("/")
         self.local = local
-        self.title = title
+        self.title = title if title is not None else os.path.splitext(
+            os.path.basename(source_file))[0]
         self.tags = tags
         self.category = category
         self.speakers = speakers
@@ -126,13 +130,8 @@ class Audio(Source):
             self.type = "audio"
             self.description = description
             self.chapters = chapters
-            self.__config_source()
         except Exception as e:
             raise Exception(f"Error during Audio creation: {e}")
-
-    def __config_source(self):
-        if self.title is None:
-            raise Exception("Please supply a title for the audio file")
 
     def process(self, working_dir):
         """Process audio"""
@@ -142,8 +141,6 @@ class Audio(Source):
             # sanity checks
             if self.local:
                 raise Exception(f"{self.source_file} is a local file")
-            if self.title is None:
-                raise Exception("Please supply a title for the audio file")
             self.logger.info(f"Downloading audio file: {self.source_file}")
             try:
                 audio = requests.get(self.source_file, stream=True)
@@ -205,7 +202,7 @@ class Audio(Source):
 
 
 class Video(Source):
-    def __init__(self, source, youtube_metadata=None, chapters=None):
+    def __init__(self, source, youtube_metadata=None, chapters=[]):
         try:
             # initialize source using a base Source
             super().__init__(source_file=source.source_file, link=source.link, loc=source.loc, local=source.local, title=source.title,
@@ -277,8 +274,7 @@ class Video(Source):
             try:
                 self.logger.info(f"Converting {video_file} to mp3...")
                 clip = VideoFileClip(video_file)
-                output_file = os.path.join(
-                    working_dir, os.path.basename(video_file)[:-4] + ".mp3")
+                output_file = os.path.join(working_dir, f"{self.title}.mp3")
                 clip.audio.write_audiofile(output_file)
                 clip.close()
                 self.logger.info("Video converted to mp3")
@@ -286,31 +282,10 @@ class Video(Source):
             except Exception as e:
                 raise Exception(f"Error converting video to mp3: {e}")
 
-        def extract_chapters_from_downloaded_video_metadata():
-            try:
-                list_of_chapters = []
-                with open(f"{working_dir}/videoFile.info.json", "r") as f:
-                    info = json.load(f)
-                if "chapters" not in info:
-                    self.logger.info("No chapters found for downloaded video")
-                    return list_of_chapters
-                for index, x in enumerate(info["chapters"]):
-                    name = x["title"]
-                    start = x["start_time"]
-                    list_of_chapters.append((str(index), start, str(name)))
-
-                return list_of_chapters
-            except Exception as e:
-                self.logger.error(
-                    f"Error reading downloaded video's metadata: {e}")
-                return []
-
         try:
             self.logger.info(f"Video processing: '{self.source_file}'")
             if not self.local:
                 abs_path = download_video()
-                if self.chapters is None:
-                    self.chapters = extract_chapters_from_downloaded_video_metadata()
             else:
                 abs_path = os.path.abspath(self.source_file)
 

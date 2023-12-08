@@ -39,7 +39,7 @@ def check_md_file(
 
     if not local:
         assert fields["media"] == media
-    assert fields["title"] == title
+    assert fields["title"] == f'"{title}"'
 
     if date:
         assert fields["date"] == date

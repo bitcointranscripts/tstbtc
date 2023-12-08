@@ -117,16 +117,16 @@ class Transcription:
                 # Invalid URL or video not found
                 raise Exception(f"Invalid source: {e}")
         try:
-            if source.source_file.endswith(".mp3") or source.source_file.endswith(".wav") or source.source_file.endswith(".m4a"):
+            if source.source_file.endswith((".mp3", ".wav", ".m4a")):
                 return Audio(source=source, chapters=chapters)
-            if source.source_file.endswith("rss") or source.source_file.endswith(".xml"):
+            if source.source_file.endswith(("rss", ".xml")):
                 return RSS(source=source)
 
             if youtube_metadata is not None:
                 # we have youtube metadata, this can only be true for videos
                 source.preprocess = False
                 return Video(source=source, youtube_metadata=youtube_metadata, chapters=chapters)
-            if source.source_file.endswith(".mp4"):
+            if source.source_file.endswith((".mp4", ".webm")):
                 # regular remote video, not youtube
                 source.preprocess = False
                 return Video(source=source)
@@ -283,14 +283,14 @@ class Transcription:
             # Add metadata prefix
             meta_data = (
                 "---\n"
-                f"title: {transcript.title}\n"
+                f'title: "{transcript.title}"\n'
                 f"transcript_by: {self.transcript_by} via TBTBTC v{__version__}\n"
             )
             if not transcript.source.local:
-                meta_data += f"media: {transcript.source.source_file}\n"
-            meta_data += f"tags: {transcript.source.tags}\n"
-            meta_data += f"speakers: {transcript.source.speakers}\n"
-            meta_data += f"categories: {transcript.source.category}\n"
+                meta_data += f"media: {transcript.source.media}\n"
+            meta_data += f"tags: {str(transcript.source.tags)}\n"
+            meta_data += f"speakers: {str(transcript.source.speakers)}\n"
+            meta_data += f"categories: {str(transcript.source.category)}\n"
             if transcript.summary:
                 meta_data += f"summary: {transcript.summary}\n"
             if transcript.source.event_date:
@@ -298,10 +298,9 @@ class Transcription:
             meta_data += "---\n"
             # Write to file
             markdown_file = f"{utils.configure_output_file_path(output_dir, transcript.title, add_timestamp=False)}.md"
-            with open(markdown_file, "a") as opf:
+            with open(markdown_file, "w") as opf:
                 opf.write(meta_data + "\n")
                 opf.write(transcript.result + "\n")
-                opf.close()
             self.logger.info(f"Markdown file stored at: {markdown_file}")
             return os.path.abspath(markdown_file)
         except Exception as e:

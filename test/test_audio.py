@@ -38,23 +38,6 @@ def test_audio_with_title():
 
 
 @pytest.mark.feature
-def test_audio_without_title():
-    with open(rel_path("testAssets/transcript.txt"), "r") as file:
-        result = file.read()
-        file.close()
-
-    source = rel_path("test/testAssets/audio.mp3")
-    title = None
-    transcription = Transcription(
-        test_mode=True
-    )
-    with pytest.raises(Exception) as error:
-        transcription.add_transcription_source(source_file=source, title=title)
-    assert "Please supply a title for the audio file" in str(error)
-    transcription.clean_up()
-
-
-@pytest.mark.feature
 def test_audio_with_all_data():
     with open(rel_path("testAssets/transcript.txt"), "r") as file:
         result = file.read()

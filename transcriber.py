@@ -252,7 +252,7 @@ def transcribe(
             transcription.add_transcription_source_JSON(source)
         else:
             transcription.add_transcription_source(
-                source_file=source, loc=loc, title=title, date=date, tags=tags, category=category, speakers=speakers,
+                source_file=source, loc=loc, title=title, date=date, tags=list(tags), category=list(category), speakers=list(speakers),
             )
         transcription.start()
         if nocleanup:
@@ -390,7 +390,6 @@ def postprocess(
         )
         # Finalize transcription service output
         transcript_to_postprocess = transcription.transcripts[0]
-        transcript_to_postprocess.title = metadata["title"]
         transcript_to_postprocess.transcription_service_output_file = metadata[
             f"{service}_output"]
         transcript_to_postprocess.result = transcription.service.finalize_transcript(

@@ -49,6 +49,6 @@ def test_download_video_file():
         source_file="https://www.youtube.com/watch?v=B0HW_sJ503Y")
     audio_file, tmp_dir = transcription.transcripts[0].process_source(
         transcription.tmp_dir)
-    assert os.path.isfile(f"{audio_file[:-4]}.mp4")  # video download
+    assert os.path.isfile(f"{tmp_dir}/videoFile.mp4")  # video download
     assert os.path.isfile(audio_file)  # mp3 convert
     application.clean_up(tmp_dir)
