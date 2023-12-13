@@ -148,7 +148,7 @@ def test_generate_payload():
         source_file=source, loc=loc, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcription.start(test_transcript=transcript)
     transcript_json = transcription.transcripts[0].to_json()
-    transcript_json["transcript_by"] = f"{username} via TBTBTC v{__version__}"
+    transcript_json["transcript_by"] = f"{username} via tstbtc v{__version__}"
     payload = {
         "content": transcript_json
     }

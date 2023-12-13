@@ -114,6 +114,12 @@ noqueue = click.option(
     default=False,
     help="Do not push the resulting transcript to the Queuer backend",
 )
+needs_review = click.option(
+    "--needs-review",
+    is_flag=True,
+    default=False,
+    help="Add 'needs review' flag to the resulting transcript",
+)
 model_output_dir = click.option(
     "-o",
     "--model_output_dir",
@@ -193,6 +199,7 @@ add_category = click.option(
 @upload_to_s3
 @save_to_markdown
 @noqueue
+@needs_review
 # Configuration options
 @model_output_dir
 @nocleanup
@@ -215,7 +222,8 @@ def transcribe(
     model_output_dir: str,
     nocleanup: bool,
     noqueue: bool,
-    markdown: bool
+    markdown: bool,
+    needs_review: bool,
 ) -> None:
     """Transcribe the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -246,6 +254,7 @@ def transcribe(
             nocleanup=nocleanup,
             queue=not noqueue,
             markdown=markdown,
+            needs_review=needs_review,
             working_dir=tmp_dir
         )
         if source.endswith(".json"):
@@ -348,6 +357,7 @@ def preprocess(
 @upload_to_s3
 @save_to_markdown
 @noqueue
+@needs_review
 def postprocess(
     metadata_json_file,
     service,
@@ -355,6 +365,7 @@ def postprocess(
     upload: bool,
     markdown: bool,
     noqueue: bool,
+    needs_review: bool,
 ):
     """Postprocess the output of a transcription service.
     Requires the metadata JSON file that is the output of the previous stage
@@ -363,15 +374,16 @@ def postprocess(
     try:
         configure_logger(log_level=logging.INFO)
         utils.check_if_valid_file_path(metadata_json_file)
-        logger.info(
-            f"Postprocessing {service} transcript from {metadata_json_file}")
         transcription = Transcription(
             deepgram=service == "deepgram",
             pr=pr,
             upload=upload,
             markdown=markdown,
             queue=not noqueue,
+            needs_review=needs_review,
         )
+        logger.info(
+            f"Postprocessing {service} transcript from {metadata_json_file}")
         with open(metadata_json_file, "r") as outfile:
             metadata_json = json.load(outfile)
         metadata = utils.configure_metadata_given_from_JSON(metadata_json)

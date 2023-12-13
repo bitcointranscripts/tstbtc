@@ -35,7 +35,7 @@ def check_md_file(
         if x.startswith("##"):
             detected_chapters.append(x[3:].strip())
 
-    assert fields["transcript_by"] == f"{transcript_by} via TBTBTC v{application.__version__}"
+    assert fields["transcript_by"] == f"{transcript_by} via tstbtc v{application.__version__}"
 
     if not local:
         assert fields["media"] == media

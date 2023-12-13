@@ -40,12 +40,17 @@ class Transcription:
         username=None,
         test_mode=False,
         working_dir=None,
-        batch_preprocessing_output=False
+        batch_preprocessing_output=False,
+        needs_review=False,
     ):
+        self.test_mode = test_mode
         self.logger = get_logger()
         self.tmp_dir = working_dir if working_dir is not None else tempfile.mkdtemp()
 
         self.transcript_by = "username" if test_mode else self.__get_username()
+        # during testing we need to create the markdown for validation purposes
+        self.markdown = markdown or test_mode
+        self.review_flag = self.__configure_review_flag(needs_review)
         self.open_pr = pr
         if deepgram:
             self.service = services.Deepgram(
@@ -57,10 +62,7 @@ class Transcription:
         self.nocleanup = nocleanup
         # during testing we do not have/need a queuer backend
         self.queuer = Queuer(test_mode=test_mode) if queue is True else None
-        # during testing we need to create the markdown for validation purposes
-        self.markdown = markdown or test_mode
         self.existing_media = None
-        self.test_mode = test_mode
         self.preprocessing_output = [] if batch_preprocessing_output else None
 
         self.logger.info(f"Temp directory: {self.tmp_dir}")
@@ -70,6 +72,17 @@ class Transcription:
         subdir_path = os.path.join(self.tmp_dir, subdir_name)
         os.makedirs(subdir_path)
         return subdir_path
+
+    def __configure_review_flag(self, needs_review):
+        # sanity check
+        if needs_review and not self.markdown:
+            raise Exception(
+                "The `--needs-review` flag is only applicable when creating a markdown")
+
+        if needs_review:
+            return " --needs-review"
+        else:
+            return ""
 
     def __get_username(self):
         try:
@@ -284,7 +297,7 @@ class Transcription:
             meta_data = (
                 "---\n"
                 f'title: "{transcript.title}"\n'
-                f"transcript_by: {self.transcript_by} via TBTBTC v{__version__}\n"
+                f"transcript_by: {self.transcript_by} via tstbtc v{__version__}{self.review_flag}\n"
             )
             if not transcript.source.local:
                 meta_data += f"media: {transcript.source.media}\n"
@@ -310,7 +323,7 @@ class Transcription:
         self.logger.info("Creating JSON file with transcription...")
         output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
         transcript_json = transcript.to_json()
-        transcript_json["transcript_by"] = f"{self.transcript_by} via TBTBTC v{__version__}"
+        transcript_json["transcript_by"] = f"{self.transcript_by} via tstbtc v{__version__}"
         json_file = utils.write_to_json(
             transcript_json,
             output_dir,
@@ -338,7 +351,7 @@ class Transcription:
                 )
             elif not self.test_mode:
                 transcript_json = transcript.to_json()
-                transcript_json["transcript_by"] = f"{self.transcript_by} via TBTBTC v{__version__}"
+                transcript_json["transcript_by"] = f"{self.transcript_by} via tstbtc v{__version__}"
                 if self.queuer:
                     return self.queuer.push_to_queue(transcript_json)
                 else:
