@@ -1,7 +1,10 @@
 import json
 import logging
 import os
+import shutil
+import random
 import re
+import subprocess
 import tempfile
 import time
 from datetime import datetime
@@ -22,13 +25,14 @@ from app import (
 )
 from app.logging import get_logger
 from app.queuer import Queuer
+from app.types import PostprocessOutput
 
 
 class Transcription:
     def __init__(
         self,
         model="tiny",
-        pr=False,
+        github=False,
         summarize=False,
         deepgram=False,
         diarize=False,
@@ -50,8 +54,8 @@ class Transcription:
         self.transcript_by = "username" if test_mode else self.__get_username()
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
+        self.bitcointranscripts_dir = self.__configure_target_repo(github)
         self.review_flag = self.__configure_review_flag(needs_review)
-        self.open_pr = pr
         if deepgram:
             self.service = services.Deepgram(
                 summarize, diarize, upload, model_output_dir)
@@ -73,13 +77,24 @@ class Transcription:
         os.makedirs(subdir_path)
         return subdir_path
 
+    def __configure_target_repo(self, github):
+        if not github:
+            return None
+        config = dotenv_values(".env")
+        git_repo_dir = config.get("BITCOINTRANSCRIPTS_DIR")
+        if not git_repo_dir:
+            raise Exception(
+                "To push to GitHub you need to define a 'BITCOINTRANSCRIPTS_DIR' in your .env file")
+            return None
+        return git_repo_dir
+
     def __configure_review_flag(self, needs_review):
         # sanity check
         if needs_review and not self.markdown:
             raise Exception(
                 "The `--needs-review` flag is only applicable when creating a markdown")
 
-        if needs_review:
+        if needs_review or self.bitcointranscripts_dir:
             return " --needs-review"
         else:
             return ""
@@ -282,9 +297,42 @@ class Transcription:
                 postprocessed_transcript = self.postprocess(transcript)
                 self.result.append(postprocessed_transcript)
 
+            if self.bitcointranscripts_dir:
+                self.push_to_github(self.result)
             return self.result
         except Exception as e:
             raise Exception(f"Error with the transcription: {e}") from e
+
+    def push_to_github(self, outputs: list[PostprocessOutput]):
+        # Change to the directory where your Git repository is located
+        os.chdir(self.bitcointranscripts_dir)
+        # Fetch the latest changes from the remote repository
+        subprocess.run(['git', 'fetch', 'origin', 'master'])
+        # Create a new branch from the fetched 'origin/master'
+        branch_name = f"{self.transcript_by}-{''.join(random.choices('0123456789', k=6))}"
+        subprocess.run(['git', 'checkout', '-b', branch_name, 'origin/master'])
+        # For each output with markdown, create a new commit in the new branch
+        for output in outputs:
+            if output.get('markdown'):
+                markdown_file = output['markdown']
+                destination_path = os.path.join(
+                    self.bitcointranscripts_dir, output["transcript"].source.loc)
+                # Ensure the markdown file exists before copying
+                if os.path.exists(markdown_file):
+                    shutil.copy(markdown_file, destination_path)
+                    markdown_file_name = os.path.basename(markdown_file)
+                    subprocess.run(['git', 'add', os.path.join(
+                        destination_path, markdown_file_name)])
+                    subprocess.run(
+                        ['git', 'commit', '-m', f'Add "{output["transcript"].title}" to {output["transcript"].source.loc}'])
+                else:
+                    print(f"Markdown file {markdown_file} does not exist.")
+
+        # Push the branch to the remote repository
+        subprocess.run(['git', 'push', 'origin', branch_name])
+        # Delete branch locally
+        subprocess.run(['git', 'checkout', 'master'])
+        subprocess.run(['git', 'branch', '-D', branch_name])
 
     def write_to_markdown_file(self, transcript: Transcript, output_dir):
         """Writes transcript to a markdown file and returns its absolute path
@@ -332,23 +380,15 @@ class Transcription:
         self.logger.info(f"Transcription stored at {json_file}")
         return json_file
 
-    def postprocess(self, transcript: Transcript):
+    def postprocess(self, transcript: Transcript) -> PostprocessOutput:
         try:
-            result = transcript.result
+            result = {}
+            result["transcript"] = transcript
             output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
-            if self.markdown:
-                transcription_md_file = self.write_to_markdown_file(
+            if self.markdown or self.bitcointranscripts_dir:
+                result["markdown"] = self.write_to_markdown_file(
                     transcript,
                     output_dir if not self.test_mode else transcript.tmp_dir)
-                result = transcription_md_file
-            if self.open_pr:
-                application.create_pr(
-                    absolute_path=transcription_md_file,
-                    loc=transcript.source.source_file,
-                    username=self.transcript_by,
-                    curr_time=str(round(time.time() * 1000)),
-                    title=transcript.title,
-                )
             elif not self.test_mode:
                 transcript_json = transcript.to_json()
                 transcript_json["transcript_by"] = f"{self.transcript_by} via tstbtc v{__version__}"
@@ -356,8 +396,7 @@ class Transcription:
                     return self.queuer.push_to_queue(transcript_json)
                 else:
                     # store payload for the user to manually send it to the queuer
-                    payload_json_file = self.write_to_json_file(transcript)
-                    result = payload_json_file
+                    result["json"] = self.write_to_json_file(transcript)
             return result
         except Exception as e:
             raise Exception(f"Error with postprocessing: {e}") from e

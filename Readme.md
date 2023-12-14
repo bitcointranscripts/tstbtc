@@ -25,7 +25,7 @@ This transcription tool operates through a structured four-stage process:
         - Process diarization. [deepgram only]
         - Process chapters.
 4. Postprocess: Offers multiple options for further actions:
-    - **Pull Request**: Opens a PR on the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo for the resulting transcript.
+    - **Push to GitHub**: Push transcripts to your fork of the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo.
     - **Markdown**: Saves transcripts in a markdown format supported by bitcointranscripts.
     - **Upload**: Saves transcripts in an AWS S3 Bucket.
     - **Push to Queuer backend**: Sends transcripts to [a Queuer backend](https://github.com/bitcointranscripts/transcription-review-backend).
@@ -37,26 +37,13 @@ This transcription tool operates through a structured four-stage process:
 - To use [deepgram](https://deepgram.com/) as a transcription service,
   you must have a valid `DEEPGRAM_API_KEY` in the `.env` file.
 
+- To push the resulting transcript to GitHub you need to fork
+  [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts)
+  and then clone your fork and define your `BITCOINTRANSCRIPTS_DIR` in the `.env` file.
+
 - To push the resulting transcript to a Queuer backend, you must have a 
   valid `QUEUE_ENDPOINT` in the `.env` file. If not, you can instead save
   the payload in a json file using the `--noqueue` flag.
-
-- To enable us fork bitcointranscript repo and open a PR, we require you to
-  login into your GitHub account. Kindly install `GITHUB CLI` using the
-  instructions on their repo [here](https://github.com/cli/cli#installation).
-  Following the prompt, please select the below options from the prompt to
-  login:
-
-    - what account do you want to log into? `Github.com`
-
-    - what is your preferred protocol for Git operations? `SSH`
-
-    - Upload your SSH public key to your GitHub account? `skip`
-
-    - How would you like to authenticate GitHub CLI? `Login with a web browser`
-
-    - copy the generated one-time pass-code and paste in the browser to
-      authenticate if you have enabled 2FA
 
 - To enable pushing the models to a S3 bucket,
     - [Install](https://aws.amazon.com/cli/) aws-cli to your system.
@@ -120,7 +107,7 @@ To configure the transcription process, you can use the following flags:
 - `-M` or `--diarize`: Supply this flag if you have multiple speakers AKA want to diarize the content [only available with deepgram]
 - `-S` or `--summarize`: Summarize the transcript [only available with deepgram]
 - `-C` or `--chapters`: For YouTube videos, include the YouTube chapters and timestamps in the resulting transcript.
-- `-p` or `--pr`: Open a PR on the bitcointranscripts repo
+- `--github`: Push transcripts to a new branch on the origin bitcointranscripts repo
 - `-u` or `--upload`: Upload processed model files to AWS S3
 - `--markdown`: Save the resulting transcript to a markdown format supported by bitcointranscripts
 - `--noqueue`: Do not push the resulting transcript to the Queuer, instead store the payload in a json file

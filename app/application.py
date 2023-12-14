@@ -28,33 +28,12 @@ def convert_wav_to_mp3(abs_path, filename, working_dir="tmp/"):
     return os.path.abspath(os.path.join(working_dir, filename[:-4] + ".mp3"))
 
 
-def create_pr(absolute_path, loc, username, curr_time, title):
-    logger = logging.getLogger(__app_name__)
-    branch_name = loc.replace("/", "-")
-    subprocess.call(
-        [
-            "bash",
-            "initializeRepo.sh",
-            absolute_path,
-            loc,
-            branch_name,
-            username,
-            curr_time,
-        ]
-    )
-    subprocess.call(
-        ["bash", "github.sh", branch_name, username, curr_time, title]
-    )
-    logger.info("Please check the PR for the transcription.")
-
-
 def clean_up(tmp_dir):
     try:
         shutil.rmtree(tmp_dir)
     except OSError as exc:
         if exc.errno != errno.ENOENT:
             raise
-
 
 
 def upload_file_to_s3(file_path):

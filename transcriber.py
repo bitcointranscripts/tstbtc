@@ -88,12 +88,11 @@ summarize = click.option(
     default=False,
     help="Summarize the transcript [only available with deepgram]",
 )
-open_pr = click.option(
-    "-p",
-    "--PR",
+github = click.option(
+    "--github",
     is_flag=True,
     default=False,
-    help="Open a PR on the bitcointranscripts repo",
+    help="Push transcripts to a new branch on the origin bitcointranscripts repo",
 )
 upload_to_s3 = click.option(
     "-u",
@@ -195,7 +194,7 @@ add_category = click.option(
 @add_category
 @add_loc
 # Options for configuring the transcription postprocess
-@open_pr
+@github
 @upload_to_s3
 @save_to_markdown
 @noqueue
@@ -213,7 +212,7 @@ def transcribe(
     tags: list,
     speakers: list,
     category: list,
-    pr: bool,
+    github: bool,
     deepgram: bool,
     summarize: bool,
     diarize: bool,
@@ -245,7 +244,7 @@ def transcribe(
     try:
         transcription = Transcription(
             model=model,
-            pr=pr,
+            github=github,
             summarize=summarize,
             deepgram=deepgram,
             diarize=diarize,
@@ -353,7 +352,7 @@ def preprocess(
 )
 @click.argument("metadata_json_file", nargs=1)
 # Options for configuring the transcription postprocess
-@open_pr
+@github
 @upload_to_s3
 @save_to_markdown
 @noqueue
@@ -361,7 +360,7 @@ def preprocess(
 def postprocess(
     metadata_json_file,
     service,
-    pr: bool,
+    github: bool,
     upload: bool,
     markdown: bool,
     noqueue: bool,
@@ -376,7 +375,7 @@ def postprocess(
         utils.check_if_valid_file_path(metadata_json_file)
         transcription = Transcription(
             deepgram=service == "deepgram",
-            pr=pr,
+            github=github,
             upload=upload,
             markdown=markdown,
             queue=not noqueue,
@@ -406,7 +405,10 @@ def postprocess(
             f"{service}_output"]
         transcript_to_postprocess.result = transcription.service.finalize_transcript(
             transcript_to_postprocess)
-        transcription.postprocess(transcript_to_postprocess)
+        postprocessed_transcript = transcription.postprocess(transcript_to_postprocess)
+
+        if transcription.bitcointranscripts_dir:
+            transcription.push_to_github([postprocessed_transcript])
     except Exception as e:
         logger.error(e)
         traceback.print_exc()

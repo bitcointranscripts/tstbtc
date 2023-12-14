@@ -13,15 +13,6 @@ def rel_path(path):
     )
 
 
-@pytest.mark.main
-def test_initialize_repo():
-    try:
-        shutil.rmtree("bitcointranscripts", ignore_errors=True)
-    except OSError as e:
-        print(f"Error occurred while removing directory: {e}")
-        assert False
-
-
 # @pytest.mark.main
 # def test_find_source_type():
 # @TODO rewwrite
