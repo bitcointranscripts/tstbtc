@@ -11,6 +11,7 @@ from app import (
     application,
     utils
 )
+from app.commands import queue
 from app.transcript import Transcript
 from app.transcription import Transcription
 from app.logging import configure_logger, get_logger
@@ -413,6 +414,8 @@ def postprocess(
         logger.error(e)
         traceback.print_exc()
 
+
+cli.add_command(queue.commands)
 
 if __name__ == '__main__':
     cli()

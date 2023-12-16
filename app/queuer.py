@@ -1,3 +1,5 @@
+from typing import Literal
+
 from dotenv import dotenv_values
 import requests
 
@@ -23,7 +25,7 @@ class Queuer:
         if "BEARER_TOKEN" not in config:
             raise Exception(
                 "To push to a queue you need to define a 'BEARER_TOKEN' in your .env file")
-        self.url = config["QUEUE_ENDPOINT"] + "/api/transcripts"
+        self.url = config["QUEUE_ENDPOINT"] + "/api"
         self.headers = {
             'Authorization': f'Bearer {config["BEARER_TOKEN"]}',
             'Content-Type': 'application/json'
@@ -36,7 +38,7 @@ class Queuer:
                 "content": transcript_json
             }
             response = requests.post(
-                self.url, json=payload, headers=self.headers)
+                f"{self.url}/transcripts", json=payload, headers=self.headers)
             if response.status_code == 200:
                 logger.info(
                     f"Transcript added to queue with id={response.json()['id']}")
@@ -46,3 +48,48 @@ class Queuer:
             return response
         except Exception as e:
             logger.error(f"Transcript not added to queue: {e}")
+
+    def get_transcript(self, id):
+        """Returns transcript based on ID from the Queuer backend"""
+        response = requests.get(
+            f"{self.url}/transcripts/{id}", headers=self.headers)
+        return response.json()
+
+    def _get_all_pages_from(self, url, params={}):
+        query_params = {'page': 1}
+        query_params.update(params)
+        all_data = []
+
+        while True:
+            response = requests.get(
+                url, headers=self.headers, params=query_params)
+            data = response.json()
+
+            # Process the current page's data
+            all_data.extend(data['data'])
+
+            # Check pagination information
+            if not data['hasNextPage']:
+                break  # Break the loop if there are no more pages
+
+            # Update query_params to fetch the next page
+            query_params['page'] += 1
+
+        return all_data
+
+    def get_queue(self):
+        """Returns an array with all the transcripts in the queue"""
+        return self._get_all_pages_from(f"{self.url}/transcripts")
+
+    def get_reviews(self, status: Literal['expired', 'pending', 'active']):
+        # TODO pagination for this endpoint has an issue, uncomment after fix
+        # return self._get_all_pages_from(f"{self.url}/reviews/all", {"status": status})
+
+        response = requests.get(
+            f"{self.url}/reviews/all", headers=self.headers, params={"status": status})
+        return response.json()["data"]
+
+    def update_transcript(self, id, payload):
+        response = requests.put(
+            f"{self.url}/{id}", json=payload, headers=self.headers)
+        return response.json()
