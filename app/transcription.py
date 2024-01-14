@@ -360,7 +360,7 @@ class Transcription:
             # Write to file
             markdown_file = f"{utils.configure_output_file_path(output_dir, transcript.title, add_timestamp=False)}.md"
             with open(markdown_file, "w") as opf:
-                opf.write(meta_data + "\n")
+                opf.write(meta_data)
                 opf.write(transcript.result + "\n")
             self.logger.info(f"Markdown file stored at: {markdown_file}")
             return os.path.abspath(markdown_file)
