@@ -11,6 +11,11 @@ from app import (
 )
 from app.logging import get_logger
 from app.transcript import Transcript
+from app.types import (
+    Sentence,
+    SpeakerSegment,
+    SpeakerSegmentWithSentences
+)
 
 logger = get_logger()
 
@@ -21,6 +26,7 @@ class Deepgram:
         self.diarize = diarize
         self.upload = upload
         self.output_dir = output_dir
+        self.dev_mode = False # Extra capabilities during development mode
 
     def audio_to_text(self, audio_file):
         logger.info("Transcribing audio to text using deepgram...")
@@ -80,7 +86,7 @@ class Deepgram:
         except Exception as e:
             logger.error(f"Error getting summary: {e}")
 
-    def process_segments(self, transcription_service_output, diarization):
+    def process_segments(self, transcription_service_output, diarization) -> list[SpeakerSegment]:
         try:
             words = transcription_service_output["results"]["channels"][0]["alternatives"][0]["words"]
             segments = []
@@ -112,11 +118,11 @@ class Deepgram:
             raise Exception(
                 f"(deepgram) Error constructing speaker segments: {e}")
 
-    def break_segments_into_sentences(self, segments):
+    def break_segments_into_sentences(self, segments) -> list[SpeakerSegmentWithSentences]:
         result = []
         # Define the sentence splitting pattern
         abbreviation_pattern = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)'
-        sentence_end_pattern = r'(?<=\.|\?)\s'
+        sentence_end_pattern = r'(?<=\.|\?|…|-)\s'
         sentence_split_pattern = f'{abbreviation_pattern}{sentence_end_pattern}'
 
         for segment in segments:
@@ -149,10 +155,10 @@ class Deepgram:
 
         return result
 
-    def adjust_chapter_timestamps(self, transformed_json, chapters):
+    def adjust_chapter_timestamps(self, speaker_segements_with_sentences, chapters):
         """Adjust the given chapter timestamps to prevent mid-sentence line break"""
-        def find_sentence_for_timestamp(transformed_json, timestamp):
-            for speaker_data in transformed_json:
+        def find_sentence_for_timestamp(speaker_segements_with_sentences, timestamp):
+            for speaker_data in speaker_segements_with_sentences:
                 for sentence_data in speaker_data["sentences"]:
                     if sentence_data["start"] <= timestamp <= sentence_data["end"]:
                         return sentence_data
@@ -167,7 +173,7 @@ class Deepgram:
         for chapter in chapters:
             chapter_start_time = chapter[1]
             chapter_sentence = find_sentence_for_timestamp(
-                transformed_json, chapter_start_time)
+                speaker_segements_with_sentences, chapter_start_time)
 
             if chapter_sentence:
                 adjusted_start_time = adjust_timestamp(
@@ -180,9 +186,166 @@ class Deepgram:
 
         return adjusted_chapters
 
-    def construct_transcript(self, speaker_segments, chapters):
+    def fix_broken_sentences(self, speaker_segments_with_sentences: list[SpeakerSegmentWithSentences]) -> list[SpeakerSegmentWithSentences]:
+        """
+        Fixes broken sentences between consecutive speaker segments by combining them with the following segment's initial sentence.
+        Broken sentences are identified by the absence of proper punctuation marks at the end. Attribution is based on sentence length,
+        with longer sentences attributed to the current speaker and shorter ones to the next speaker.
+        """
+        def sentence_is_broken(last_sentence_current: Sentence, first_sentence_next: Sentence):
+            """
+            Helper method to check if a Sentence is broken.
+            Sentence is broken if the last character of the sentence is not one of the accepted punctuation marks.
+            """
+            confidence_threshold = 0.0 # 0.0 means that confidence_threshold is disabled
+            last_char = last_sentence_current["transcript"][-1]
+            if last_char not in ['.', '?', ',', '…']:
+                confidence_difference = abs(last_sentence_current["words"][-1]["speaker_confidence"] - first_sentence_next["words"][0]["speaker_confidence"])
+                if confidence_difference > confidence_threshold:
+                    return True
+            
+            return False
+
+        def update_segment_attributes(segment: SpeakerSegmentWithSentences):
+            """
+            Updates the attributes of a SpeakerSegmentWithSentences object to reflect changes in its sentences list.
+            This method recalculates and sets the 'transcript', 'start', and 'end' attributes based on the current
+            sentences within the segment.
+            """
+            if segment["sentences"]:
+                # Update the transcript by concatenating all sentence transcripts
+                segment["transcript"] = ' '.join(sentence["transcript"] for sentence in segment["sentences"])
+                
+                # Update the start and end times based on the sentences
+                segment["start"] = segment["sentences"][0]["start"]
+                segment["end"] = segment["sentences"][-1]["end"]
+
+        def add_band_aid_word(last_sentence_current, first_sentence_next):
+            """
+            Creates a "band-aid" word entry to indicate the point of sentence merging in development mode.
+            This method calculates the difference in speaker confidence between the last word of the current sentence 
+            and the first word of the next sentence. The band-aid word is formatted as '[bs={difference}]', where 
+            'difference' is the calculated speaker confidence difference. This helps in visually identifying the 
+            location and degree of modification when sentences are combined due to the broken sentence heuristic.
+            """
+            # Calculate the speaker confidence difference
+            confidence_difference = abs(last_sentence_current["words"][-1]["speaker_confidence"] - first_sentence_next["words"][0]["speaker_confidence"])
+            # Create a band-aid word entry
+            band_aid_word = {
+                "punctuated_word": "[bs={:.3f}]".format(confidence_difference),
+                "speaker_confidence": 0  # Or some other appropriate default value
+            }
+            return band_aid_word
+
+        i = 0
+        while i < len(speaker_segments_with_sentences) - 1:
+            current_segment = speaker_segments_with_sentences[i]
+            next_segment = speaker_segments_with_sentences[i + 1]
+
+            if current_segment["sentences"]:
+                last_sentence_current = current_segment["sentences"][-1]
+                first_sentence_next = next_segment["sentences"][0]
+
+                if sentence_is_broken(last_sentence_current, first_sentence_next):
+                    combined_sentence = {
+                        "transcript": last_sentence_current["transcript"] + ' ' + first_sentence_next["transcript"],
+                        "start": last_sentence_current["start"],
+                        "end": first_sentence_next["end"],
+                        "words": last_sentence_current["words"] + first_sentence_next["words"],
+                        "fixed_by_heuristic": "broken-sentence"
+                    }
+                    # Add the band-aid word if in dev mode
+                    if self.dev_mode:
+                        band_aid_word = add_band_aid_word(last_sentence_current, first_sentence_next)
+                        # Insert the band-aid word at the junction of the two sentences
+                        combined_sentence["words"] = last_sentence_current["words"] + [band_aid_word] + first_sentence_next["words"]
+
+                    # Determine which segment is longer
+                    if last_sentence_current["end"] - last_sentence_current["start"] > first_sentence_next["end"] - first_sentence_next["start"]:
+                        # Attribute the broken sentence to the current speaker
+                        current_segment["sentences"][-1] = combined_sentence
+                        # Remove the first sentence of the next segment
+                        next_segment["sentences"].pop(0)
+                    else:
+                        # Attribute the broken sentence to the next speaker
+                        next_segment["sentences"][0] = combined_sentence
+                        # Remove the last sentence of the current segment
+                        current_segment["sentences"].pop()
+
+                    update_segment_attributes(current_segment)
+                    update_segment_attributes(next_segment)
+
+            # Check if next_segment is empty and remove it if it is
+            if not next_segment["sentences"]:
+                speaker_segments_with_sentences.pop(i + 1)
+            else:
+                i += 1
+
+        # Remove any empty speaker segments from the list
+        speaker_segments_with_sentences = [segment for segment in speaker_segments_with_sentences if segment["sentences"]]
+
+        # Merge consecutive segments with the same speaker
+        i = 0
+        while i < len(speaker_segments_with_sentences) - 1:
+            current_segment = speaker_segments_with_sentences[i]
+            next_segment = speaker_segments_with_sentences[i + 1]
+            if current_segment["speaker"] == next_segment["speaker"]:
+                current_segment["transcript"] += " " + next_segment["transcript"]
+                current_segment["end"] = next_segment["end"]
+                current_segment["sentences"].extend(next_segment["sentences"])
+                speaker_segments_with_sentences.pop(i + 1)
+            else:
+                i += 1
+
+        return speaker_segments_with_sentences
+
+    def construct_transcript(self, speaker_segments: list[SpeakerSegmentWithSentences], chapters):
+        def add_timestamp(speaker, timestamp):
+            return f"Speaker {speaker}: {utils.decimal_to_sexagesimal(timestamp)}\n\n"
+
+        def construct_sentence(sentence: Sentence):
+            """
+            Constructs a sentence string from individual words.
+            """
+            def construct_sentence_with_confidence_annotations(sentence: Sentence):
+                """
+                Constructs a sentence string with embedded speaker confidence annotations.
+                This method constructs a sentence string from individual words, appending the speaker confidence 
+                for each word or group of words with the same confidence. In development mode, this aids in
+                analyzing and debugging the sentence construction process by providing clear visibility of
+                confidence levels and sentence modification points.
+                """
+                final_sentence = ""
+                num_words = len(sentence["words"])
+                if num_words == 0:
+                    return final_sentence
+
+                current_confidence = round(sentence["words"][0]["speaker_confidence"], 3)
+                for i, word in enumerate(sentence["words"]):
+                    next_confidence = round(sentence["words"][i + 1]["speaker_confidence"], 3) if i + 1 < num_words else None
+
+                    final_sentence += word["punctuated_word"]
+
+                    if next_confidence != current_confidence or i == num_words - 1:
+                        # Append the speaker confidence at the end of a word group with the same confidence
+                        final_sentence += f'[{current_confidence}]'
+                        if i < num_words - 1:
+                            final_sentence += ' '  # Add space if not the final word
+                        current_confidence = next_confidence
+                    else:
+                        final_sentence += ' '
+
+                return final_sentence
+
+            include_annotations = False
+            if include_annotations:
+                return construct_sentence_with_confidence_annotations(sentence)
+            else:
+                return " ".join(word["punctuated_word"] for word in sentence["words"])
+        
+
         try:
-            formatted_transcript = ""
+            final_transcript = ""
             chapter_index = 0 if chapters else None
 
             for speaker_data in speaker_segments:
@@ -198,20 +361,24 @@ class Deepgram:
 
                         if chapter_start_time <= sentence_start:
                             # Chapter starts at this sentence
-                            formatted_transcript += "\n" if not first_sentence else ""
-                            formatted_transcript += f"## {chapter_title}\n\n"
+                            final_transcript += "\n" if not first_sentence else ""
+                            final_transcript += f"## {chapter_title}\n\n"
                             if not single_speaker and not first_sentence:
-                                formatted_transcript += f"Speaker {speaker_id}: {utils.decimal_to_sexagesimal(chapter_start_time)}\n\n"
+                                final_transcript += add_timestamp(speaker_id, chapter_start_time)
                             chapter_index += 1
 
                     if not single_speaker and first_sentence:
-                        formatted_transcript += f"Speaker {speaker_id}: {utils.decimal_to_sexagesimal(sentence_start)}\n\n"
+                        final_transcript += add_timestamp(speaker_id, sentence_start)
 
-                    formatted_transcript += f'{sentence_data["transcript"]}\n'
+                    # Add the band-aid word if in dev mode
+                    if self.dev_mode:
+                        final_transcript += f'{construct_sentence(sentence_data)}\n'
+                    else:
+                        final_transcript += f'{sentence_data["transcript"]}\n'
 
-                formatted_transcript += "\n"
+                final_transcript += "\n"
 
-            return formatted_transcript.strip()
+            return final_transcript.strip()
         except Exception as e:
             raise Exception(f"Error creating output format: {e}")
 
@@ -229,8 +396,8 @@ class Deepgram:
                 transcription_service_output, has_diarization)
             speaker_segements_with_sentences = self.break_segments_into_sentences(
                 speaker_segments)
-            with open("test.json", "w") as json_file:
-                json.dump(speaker_segements_with_sentences, json_file, indent=4)
+            speaker_segements_with_sentences = self.fix_broken_sentences(
+                speaker_segements_with_sentences)
             adjusted_chapters = self.adjust_chapter_timestamps(
                 speaker_segements_with_sentences, transcript.source.chapters)
             result = self.construct_transcript(
