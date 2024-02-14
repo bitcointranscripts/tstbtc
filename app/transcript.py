@@ -239,6 +239,9 @@ class Video(Source):
                 self.chapters = []
                 has_chapters = yt_info.get('chapters', None)
                 if has_chapters:
+                    # YouTube adds an extra chapter when a starting chapter is not defined
+                    if yt_info["chapters"][0]["title"] == '<Untitled Chapter 1>':
+                        yt_info["chapters"].pop(0)
                     for index, x in enumerate(yt_info["chapters"]):
                         name = x["title"]
                         start = x["start_time"]
