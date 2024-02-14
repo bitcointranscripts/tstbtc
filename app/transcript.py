@@ -147,11 +147,15 @@ class Audio(Source):
                 output_file = os.path.join(
                     working_dir, f"{slugify(self.title)}.mp3")
                 with open(output_file, "wb") as f:
-                    total_length = int(audio.headers.get("content-length"))
-                    for chunk in progress.bar(
-                        audio.iter_content(chunk_size=1024),
-                        expected_size=(total_length / 1024) + 1,
-                    ):
+                    chunked_audio = audio.iter_content(chunk_size=1024)
+                    total_length = audio.headers.get("content-length")
+                    if total_length is None:
+                        self.logger.warning(
+                            "Content length not available. Unable to display progress bar.")
+                    else:
+                        chunked_audio = progress.bar(
+                            chunked_audio, expected_size=(int(total_length) / 1024) + 1)
+                    for chunk in chunked_audio:
                         if chunk:
                             f.write(chunk)
                             f.flush()
