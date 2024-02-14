@@ -1,21 +1,20 @@
-import json
-import logging
 import os
 import shutil
 import random
-import re
 import subprocess
 import tempfile
-import time
-from datetime import datetime
 
 from dotenv import dotenv_values
-import pytube
-from pytube.exceptions import PytubeError
-import requests
 import yt_dlp
 
-from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
+from app.transcript import (
+    Transcript,
+    Source,
+    Audio,
+    Video,
+    Playlist,
+    RSS
+)
 from app import (
     __app_name__,
     __version__,
@@ -25,14 +24,17 @@ from app import (
 )
 from app.logging import get_logger
 from app.queuer import Queuer
-from app.types import PostprocessOutput
+from app.types import (
+    GitHubMode,
+    PostprocessOutput
+)
 
 
 class Transcription:
     def __init__(
         self,
         model="tiny",
-        github=False,
+        github: GitHubMode = "none",
         summarize=False,
         deepgram=False,
         diarize=False,
@@ -77,15 +79,15 @@ class Transcription:
         os.makedirs(subdir_path)
         return subdir_path
 
-    def __configure_target_repo(self, github):
-        if not github:
+    def __configure_target_repo(self, github: GitHubMode):
+        if github == "none":
             return None
         config = dotenv_values(".env")
         git_repo_dir = config.get("BITCOINTRANSCRIPTS_DIR")
         if not git_repo_dir:
             raise Exception(
                 "To push to GitHub you need to define a 'BITCOINTRANSCRIPTS_DIR' in your .env file")
-            return None
+        self.github = github
         return git_repo_dir
 
     def __configure_review_flag(self, needs_review):
@@ -218,7 +220,8 @@ class Transcription:
                           tags, category, speakers, preprocess, link),
             youtube_metadata=youtube_metadata,
             chapters=chapters)
-        self.logger.info(f"Detected source: {source}")
+        self.logger.debug(f"Detected source: {source}")
+
         if source.type == "playlist":
             # add a transcript for each source/video in the playlist
             for video in source.videos:
@@ -306,17 +309,22 @@ class Transcription:
     def push_to_github(self, outputs: list[PostprocessOutput]):
         # Change to the directory where your Git repository is located
         os.chdir(self.bitcointranscripts_dir)
-        # Fetch the latest changes from the remote repository
-        subprocess.run(['git', 'fetch', 'origin', 'master'])
-        # Create a new branch from the fetched 'origin/master'
-        branch_name = f"{self.transcript_by}-{''.join(random.choices('0123456789', k=6))}"
-        subprocess.run(['git', 'checkout', '-b', branch_name, 'origin/master'])
+        if self.github == "remote":
+            # Fetch the latest changes from the remote repository
+            subprocess.run(['git', 'fetch', 'origin', 'master'])
+            # Create a new branch from the fetched 'origin/master'
+            branch_name = f"{self.transcript_by}-{''.join(random.choices('0123456789', k=6))}"
+            subprocess.run(
+                ['git', 'checkout', '-b', branch_name, 'origin/master'])
+
         # For each output with markdown, create a new commit in the new branch
         for output in outputs:
             if output.get('markdown'):
                 markdown_file = output['markdown']
                 destination_path = os.path.join(
                     self.bitcointranscripts_dir, output["transcript"].source.loc)
+                # Create the destination directory if it doesn't exist
+                os.makedirs(destination_path, exist_ok=True)
                 # Ensure the markdown file exists before copying
                 if os.path.exists(markdown_file):
                     shutil.copy(markdown_file, destination_path)
@@ -328,11 +336,12 @@ class Transcription:
                 else:
                     print(f"Markdown file {markdown_file} does not exist.")
 
-        # Push the branch to the remote repository
-        subprocess.run(['git', 'push', 'origin', branch_name])
-        # Delete branch locally
-        subprocess.run(['git', 'checkout', 'master'])
-        subprocess.run(['git', 'branch', '-D', branch_name])
+        if self.github == "remote":
+            # Push the branch to the remote repository
+            subprocess.run(['git', 'push', 'origin', branch_name])
+            # Delete branch locally
+            subprocess.run(['git', 'checkout', 'master'])
+            subprocess.run(['git', 'branch', '-D', branch_name])
 
     def write_to_markdown_file(self, transcript: Transcript, output_dir):
         """Writes transcript to a markdown file and returns its absolute path

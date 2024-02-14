@@ -1,10 +1,12 @@
 from typing import (
+    Literal,
     TypedDict,
     Optional
 )
 
 from app.transcript import Transcript
 
+GitHubMode = Literal["remote", "local", "none"]
 
 class PostprocessOutput(TypedDict):
     transcript: Transcript

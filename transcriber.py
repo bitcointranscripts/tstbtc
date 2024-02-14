@@ -8,13 +8,13 @@ import click
 from app import (
     __app_name__,
     __version__,
-    application,
     utils
 )
 from app.commands import queue
+from app.logging import configure_logger, get_logger
 from app.transcript import Transcript
 from app.transcription import Transcription
-from app.logging import configure_logger, get_logger
+from app.types import GitHubMode
 
 logger = get_logger()
 
@@ -91,9 +91,13 @@ summarize = click.option(
 )
 github = click.option(
     "--github",
-    is_flag=True,
-    default=False,
-    help="Push transcripts to a new branch on the origin bitcointranscripts repo",
+    type=click.Choice(["remote", "local", "none"]),
+    default="none",
+    help=("Specify the GitHub operation mode."
+          "'remote': Create a new branch, push changes to it, and push it to the origin bitcointranscripts repo. "
+          "'local': Commit changes to the current local branch without pushing to the remote repo."
+          "'none': Do not perform any GitHub operations."),
+    show_default=True
 )
 upload_to_s3 = click.option(
     "-u",
@@ -213,7 +217,7 @@ def transcribe(
     tags: list,
     speakers: list,
     category: list,
-    github: bool,
+    github: GitHubMode,
     deepgram: bool,
     summarize: bool,
     diarize: bool,
@@ -317,6 +321,7 @@ def preprocess(
         configure_logger(log_level=logging.INFO)
         logger.info(f"Preprocessing sources...")
         transcription = Transcription(
+            queue=False,
             batch_preprocessing_output=not no_batched_output)
         if source.endswith(".json"):
             transcription.add_transcription_source_JSON(source, nocheck=nocheck)
@@ -361,7 +366,7 @@ def preprocess(
 def postprocess(
     metadata_json_file,
     service,
-    github: bool,
+    github: GitHubMode,
     upload: bool,
     markdown: bool,
     noqueue: bool,
@@ -406,7 +411,8 @@ def postprocess(
             f"{service}_output"]
         transcript_to_postprocess.result = transcription.service.finalize_transcript(
             transcript_to_postprocess)
-        postprocessed_transcript = transcription.postprocess(transcript_to_postprocess)
+        postprocessed_transcript = transcription.postprocess(
+            transcript_to_postprocess)
 
         if transcription.bitcointranscripts_dir:
             transcription.push_to_github([postprocessed_transcript])

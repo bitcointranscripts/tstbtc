@@ -106,8 +106,7 @@ To configure the transcription process, you can use the following flags:
 - `-D` or `--deepgram`: Use deepgram for transcription, instead of using the whisper model [default: False]
 - `-M` or `--diarize`: Supply this flag if you have multiple speakers AKA want to diarize the content [only available with deepgram]
 - `-S` or `--summarize`: Summarize the transcript [only available with deepgram]
-- `-C` or `--chapters`: For YouTube videos, include the YouTube chapters and timestamps in the resulting transcript.
-- `--github`: Push transcripts to a new branch on the origin bitcointranscripts repo
+- `--github`: Specify the GitHub operation mode
 - `-u` or `--upload`: Upload processed model files to AWS S3
 - `--markdown`: Save the resulting transcript to a markdown format supported by bitcointranscripts
 - `--noqueue`: Do not push the resulting transcript to the Queuer, instead store the payload in a json file
