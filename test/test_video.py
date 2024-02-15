@@ -30,7 +30,7 @@ def test_video_with_title():
         test_mode=True,
     )
     transcription.add_transcription_source(
-        source, title, date, tags, category, speakers)
+        source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start()
 
     assert os.path.isfile(transcripts[0]["markdown"])

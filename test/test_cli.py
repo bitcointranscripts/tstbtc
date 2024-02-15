@@ -37,7 +37,7 @@ def test_download_video_file():
         test_mode=True,
     )
     transcription.add_transcription_source(
-        source_file="https://www.youtube.com/watch?v=B0HW_sJ503Y")
+        source_file="https://www.youtube.com/watch?v=B0HW_sJ503Y", title="test")
     audio_file, tmp_dir = transcription.transcripts[0].process_source(
         transcription.tmp_dir)
     assert os.path.isfile(f"{tmp_dir}/videoFile.mp4")  # video download

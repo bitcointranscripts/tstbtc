@@ -16,11 +16,15 @@ import yt_dlp
 from clint.textui import progress
 from moviepy.editor import VideoFileClip
 
-from app import __app_name__, __version__, application
-from app.logging import get_logger
-from app.utils import slugify, write_to_json
+from app import (
+    __app_name__,
+    __version__,
+    application,
+    logging,
+    utils
+)
 
-logger = get_logger()
+logger = logging.get_logger()
 
 
 class Transcript:
@@ -31,7 +35,7 @@ class Transcript:
         self.transcription_service_output_file = None
         self.summary = None
         self.test_mode = test_mode
-        self.logger = get_logger()
+        self.logger = logging.get_logger()
 
     def process_source(self, tmp_dir=None):
         tmp_dir = tmp_dir if tmp_dir is not None else tempfile.mkdtemp()
@@ -72,15 +76,14 @@ class Source:
         self.save_source(source_file=source_file, loc=loc, local=local, title=title, tags=tags,
                          category=category, speakers=speakers, preprocess=preprocess, link=link)
         self.__config_event_date(date)
-        self.logger = get_logger()
+        self.logger = logging.get_logger()
 
     def save_source(self, source_file, loc, local, title, tags, category, speakers, preprocess, link):
         self.source_file = source_file
         self.link = link  # the url that will be used as `media` for the transcript. It contains more metadata than just the audio download link
         self.loc = loc.strip("/")
         self.local = local
-        self.title = title if title is not None else os.path.splitext(
-            os.path.basename(source_file))[0]
+        self.title = title
         self.tags = tags
         self.category = category
         self.speakers = speakers
@@ -130,6 +133,8 @@ class Audio(Source):
             self.type = "audio"
             self.description = description
             self.chapters = chapters
+            if self.title is None:
+                os.path.splitext(os.path.basename(self.source_file))[0]
         except Exception as e:
             raise Exception(f"Error during Audio creation: {e}")
 
@@ -145,7 +150,7 @@ class Audio(Source):
             try:
                 audio = requests.get(self.source_file, stream=True)
                 output_file = os.path.join(
-                    working_dir, f"{slugify(self.title)}.mp3")
+                    working_dir, f"{utils.slugify(self.title)}.mp3")
                 with open(output_file, "wb") as f:
                     chunked_audio = audio.iter_content(chunk_size=1024)
                     total_length = audio.headers.get("content-length")
@@ -231,14 +236,16 @@ class Video(Source):
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 yt_info = ydl.extract_info(self.source_file, download=False)
-                self.title = yt_info.get('title', 'N/A')
+                if self.title is None:
+                    self.title = yt_info.get('title', 'N/A')
                 self.youtube_metadata = {
                     "description": yt_info.get('description', 'N/A'),
                     "tags": yt_info.get('tags', 'N/A'),
                     "categories": yt_info.get('categories', 'N/A')
                 }
-                self.event_date = datetime.strptime(yt_info.get(
-                    'upload_date', None), "%Y%m%d").date() if yt_info.get('upload_date', None) else None
+                if self.event_date is None and yt_info.get('upload_date', None):
+                    self.event_date = datetime.strptime(
+                        yt_info.get('upload_date', None), "%Y%m%d").date()
                 # Extract chapters from video's metadata
                 self.chapters = []
                 has_chapters = yt_info.get('chapters', None)
@@ -281,7 +288,8 @@ class Video(Source):
             try:
                 self.logger.info(f"Converting {video_file} to mp3...")
                 clip = VideoFileClip(video_file)
-                output_file = os.path.join(working_dir, f"{self.title}.mp3")
+                output_file = os.path.join(
+                    working_dir, f"{utils.slugify(self.title)}.mp3")
                 clip.audio.write_audiofile(output_file)
                 clip.close()
                 self.logger.info("Video converted to mp3")
