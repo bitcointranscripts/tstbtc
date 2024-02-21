@@ -56,7 +56,7 @@ def check_if_valid_file_path(file_path):
         raise Exception(f"Not a valid file: {file_path}")
 
 
-def configure_metadata_given_from_JSON(source):
+def configure_metadata_given_from_JSON(source, from_json=None):
     """Helper method that deals with missings fields from JSON
     by assigning default values"""
     try:
@@ -82,7 +82,9 @@ def configure_metadata_given_from_JSON(source):
         for service in services:
             key = f"{service}_output"
             metadata[key] = source.get(key, None)
-            if metadata[key] is not None:
+            if metadata[key] is not None and from_json is not None:
+                base_directory = os.path.dirname(from_json)
+                metadata[key] = os.path.join(base_directory, metadata[key])
                 check_if_valid_file_path(metadata[key])
 
         return metadata

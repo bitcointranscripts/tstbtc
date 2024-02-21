@@ -1,5 +1,6 @@
 import json
 import mimetypes
+import os
 import re
 
 import deepgram
@@ -57,14 +58,15 @@ class Deepgram:
         transcription_service_output_file = utils.write_to_json(
             transcription_service_output, f"{self.output_dir}/{transcript.source.loc}", transcript.title, is_metadata=True)
         logger.info(
-            f"(deepgram) Model stored at: {transcription_service_output_file}")
+            f"(deepgram) Model output stored at: {transcription_service_output_file}")
+
         # Add deepgram output file path to transcript's metadata file
         if transcript.metadata_file is not None:
             # Read existing content of the metadata file
             with open(transcript.metadata_file, 'r') as file:
                 data = json.load(file)
             # Add deepgram output
-            data['deepgram_output'] = transcription_service_output_file
+            data['deepgram_output'] = os.path.basename(transcription_service_output_file)
             # Write the updated dictionary back to the JSON file
             with open(transcript.metadata_file, 'w') as file:
                 json.dump(data, file, indent=4)
@@ -384,6 +386,8 @@ class Deepgram:
 
     def finalize_transcript(self, transcript: Transcript):
         try:
+            if not transcript.transcription_service_output_file:
+                raise Exception("No 'deepgram_output' found in JSON")
             with open(transcript.transcription_service_output_file, "r") as outfile:
                 transcription_service_output = json.load(outfile)
 

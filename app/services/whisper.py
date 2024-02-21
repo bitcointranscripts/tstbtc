@@ -1,4 +1,5 @@
 import json
+import os
 
 import whisper
 
@@ -28,21 +29,22 @@ class Whisper:
             return result
         except Exception as e:
             logger.error(
-                f"(wisper,{service}) Error transcribing audio to text: {e}")
+                f"(wisper,{self.model}) Error transcribing audio to text: {e}")
             return
 
     def write_to_json_file(self, transcription_service_output, transcript: Transcript):
         transcription_service_output_file = utils.write_to_json(
             transcription_service_output, f"{self.output_dir}/{transcript.source.loc}", transcript.title, is_metadata=True)
         logger.info(
-            f"(whisper) Model stored at: {transcription_service_output_file}")
+            f"(whisper) Model output stored at: {transcription_service_output_file}")
+        
         # Add whisper output file path to transcript's metadata file
         if transcript.metadata_file is not None:
             # Read existing content of the metadata file
             with open(transcript.metadata_file, 'r') as file:
                 data = json.load(file)
             # Add whisper output
-            data['whisper_output'] = transcription_service_output_file
+            data['whisper_output'] = os.path.basename(transcription_service_output_file)
             # Write the updated dictionary back to the JSON file
             with open(transcript.metadata_file, 'w') as file:
                 json.dump(data, file, indent=4)
@@ -103,6 +105,8 @@ class Whisper:
 
     def finalize_transcript(self, transcript: Transcript):
         try:
+            if not transcript.transcription_service_output_file:
+                raise Exception("No 'whisper_output' found in JSON")
             with open(transcript.transcription_service_output_file, "r") as outfile:
                 transcription_service_output = json.load(outfile)
 

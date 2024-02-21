@@ -391,7 +391,7 @@ def postprocess(
             f"Postprocessing {service} transcript from {metadata_json_file}")
         with open(metadata_json_file, "r") as outfile:
             metadata_json = json.load(outfile)
-        metadata = utils.configure_metadata_given_from_JSON(metadata_json)
+        metadata = utils.configure_metadata_given_from_JSON(metadata_json, from_json=metadata_json_file)
         transcription.add_transcription_source(
             source_file=metadata["source_file"],
             loc=metadata["loc"],
