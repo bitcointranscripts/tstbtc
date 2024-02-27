@@ -1,17 +1,18 @@
-import json
 import logging
 import os
-import re
-import shutil
 import tempfile
-from datetime import datetime, date
-from urllib.parse import parse_qs, urlparse
+from datetime import (
+    datetime,
+    date
+)
+from typing import (
+    Optional,
+    TypedDict
+)
 
 import feedparser
-import pytube
 import requests
 import static_ffmpeg
-import whisper
 import yt_dlp
 from clint.textui import progress
 from moviepy.editor import VideoFileClip
@@ -43,6 +44,10 @@ class Transcript:
         return self.audio_file, tmp_dir
 
     @property
+    def output_path_with_title(self):
+        return self.source.output_path_with_title
+
+    @property
     def title(self):
         return self.source.title
 
@@ -70,6 +75,12 @@ class Transcript:
         return json_data
 
 
+class PostprocessOutput(TypedDict):
+    transcript: Transcript
+    markdown: Optional[str]
+    json: Optional[str]
+
+
 class Source:
     def __init__(self, source_file, loc, local, title, date, tags, category, speakers, preprocess, link=None):
         # initialize source with arguments
@@ -88,6 +99,10 @@ class Source:
         self.category = category
         self.speakers = speakers
         self.preprocess = preprocess
+
+    @property
+    def output_path_with_title(self):
+        return os.path.join(self.loc.strip("/"), utils.slugify(self.title))
 
     @property
     def media(self):
@@ -112,7 +127,6 @@ class Source:
                     self.event_date = date
             except ValueError as e:
                 raise ValueError(f"Supplied date is invalid: {e}")
-                return
 
     def initialize(self):
         try:

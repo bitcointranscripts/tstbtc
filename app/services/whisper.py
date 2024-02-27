@@ -7,6 +7,7 @@ from app import (
     application,
     utils
 )
+from app.data_writer import DataWriter
 from app.logging import get_logger
 from app.transcript import Transcript
 
@@ -14,10 +15,10 @@ logger = get_logger()
 
 
 class Whisper:
-    def __init__(self, model, upload, output_dir):
+    def __init__(self, model, upload, data_writer: DataWriter):
         self.model = model
         self.upload = upload
-        self.output_dir = output_dir
+        self.data_writer = data_writer
 
     def audio_to_text(self, audio_file):
         logger.info(
@@ -33,25 +34,26 @@ class Whisper:
             return
 
     def write_to_json_file(self, transcription_service_output, transcript: Transcript):
-        transcription_service_output_file = utils.write_to_json(
-            transcription_service_output, f"{self.output_dir}/{transcript.source.loc}", transcript.title, is_metadata=True)
+        transcription_service_output_file = self.data_writer.write_json(
+            data=transcription_service_output, file_path=transcript.output_path_with_title, filename='whisper')
         logger.info(
             f"(whisper) Model output stored at: {transcription_service_output_file}")
-        
+
         # Add whisper output file path to transcript's metadata file
         if transcript.metadata_file is not None:
             # Read existing content of the metadata file
             with open(transcript.metadata_file, 'r') as file:
                 data = json.load(file)
             # Add whisper output
-            data['whisper_output'] = os.path.basename(transcription_service_output_file)
+            data['whisper_output'] = os.path.basename(
+                transcription_service_output_file)
             # Write the updated dictionary back to the JSON file
             with open(transcript.metadata_file, 'w') as file:
                 json.dump(data, file, indent=4)
 
         return transcription_service_output_file
 
-    def generate_srt(self, data, filename, loc):
+    def generate_srt(self, data, transcript: Transcript):
         def format_time(time):
             hours = int(time / 3600)
             minutes = int((time % 3600) / 60)
@@ -59,7 +61,8 @@ class Whisper:
             milliseconds = int((time % 1) * 1000)
             return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
-        output_file = f"{utils.configure_output_file_path(f'{self.output_dir}/{loc}', filename, is_metadata=True)}.srt"
+        output_file = self.data_writer.construct_file_path(
+            file_path=transcript.output_path_with_title, filename="whisper", type='srt')
         logger.info(f"(whisper) Writing srt to {output_file}...")
         with open(output_file, "w") as f:
             for index, segment in enumerate(data["segments"]):
@@ -126,7 +129,7 @@ class Whisper:
             transcript.transcription_service_output_file = self.write_to_json_file(
                 transcription_service_output, transcript)
             transcript_srt_file = self.generate_srt(
-                transcription_service_output, transcript.title, transcript.source.loc)
+                transcription_service_output, transcript)
             if self.upload:
                 application.upload_file_to_s3(transcript_srt_file)
             transcript.result = self.finalize_transcript(transcript)

@@ -1,17 +1,11 @@
 from typing import (
     Literal,
-    TypedDict,
-    Optional
+    TypedDict
 )
 
-from app.transcript import Transcript
 
 GitHubMode = Literal["remote", "local", "none"]
 
-class PostprocessOutput(TypedDict):
-    transcript: Transcript
-    markdown: Optional[str]
-    json: Optional[str]
 
 class Word(TypedDict):
     word: str
@@ -22,6 +16,7 @@ class Word(TypedDict):
     speaker_confidence: float
     punctuated_word: str
 
+
 class SpeakerSegment(TypedDict):
     speaker: int
     transcript: str
@@ -29,11 +24,13 @@ class SpeakerSegment(TypedDict):
     end: float
     words: list[Word]
 
+
 class Sentence(TypedDict):
     transcript: str
     start: float
     end: float
     words: list[Word]
+
 
 class SpeakerSegmentWithSentences(TypedDict):
     speaker: int

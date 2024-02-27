@@ -8,6 +8,7 @@ from dotenv import dotenv_values
 import yt_dlp
 
 from app.transcript import (
+    PostprocessOutput,
     Transcript,
     Source,
     Audio,
@@ -26,8 +27,8 @@ from app.logging import get_logger
 from app.queuer import Queuer
 from app.types import (
     GitHubMode,
-    PostprocessOutput
 )
+from app.data_writer import DataWriter
 
 
 class Transcription:
@@ -56,13 +57,15 @@ class Transcription:
         self.transcript_by = "username" if test_mode else self.__get_username()
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
+        self.metadata_writer = DataWriter(
+            self.__configure_tstbtc_metadata_dir())
         self.bitcointranscripts_dir = self.__configure_target_repo(github)
         self.review_flag = self.__configure_review_flag(needs_review)
         if deepgram:
             self.service = services.Deepgram(
-                summarize, diarize, upload, model_output_dir)
+                summarize, diarize, upload, self.metadata_writer)
         else:
-            self.service = services.Whisper(model, upload, model_output_dir)
+            self.service = services.Whisper(model, upload, self.metadata_writer)
         self.model_output_dir = model_output_dir
         self.transcripts = []
         self.nocleanup = nocleanup
@@ -78,6 +81,16 @@ class Transcription:
         subdir_path = os.path.join(self.tmp_dir, subdir_name)
         os.makedirs(subdir_path)
         return subdir_path
+
+    def __configure_tstbtc_metadata_dir(self):
+        config = dotenv_values(".env")
+        metadata_dir = config.get("TSTBTC_METADATA_DIR")
+        if not metadata_dir:
+            alternative_metadata_dir = "/metadata"
+            self.logger.warning(
+                f"'TSTBTC_METADATA_DIR' environment variable is not defined. Metadata will be stored at '{alternative_metadata_dir}'.")
+            return alternative_metadata_dir
+        return metadata_dir
 
     def __configure_target_repo(self, github: GitHubMode):
         if github == "none":
@@ -172,12 +185,9 @@ class Transcription:
         metadata_file = None
         if source.preprocess:
             if self.preprocessing_output is None:
-                # Save preprocessing output for each individual source
-                metadata_file = utils.write_to_json(
-                    source.to_json(),
-                    f"{self.model_output_dir}/{source.loc}",
-                    f"{source.title}_metadata", is_metadata=True
-                )
+                # Save preprocessing output for the specific source
+                metadata_file = self.metadata_writer.write_json(data=source.to_json(
+                ), file_path=source.output_path_with_title, filename='metadata')
             else:
                 # Keep preprocessing outputs for later use
                 self.preprocessing_output.append(source.to_json())

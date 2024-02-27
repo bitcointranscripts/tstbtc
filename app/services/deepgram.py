@@ -10,6 +10,7 @@ from app import (
     application,
     utils
 )
+from app.data_writer import DataWriter
 from app.logging import get_logger
 from app.transcript import Transcript
 from app.types import (
@@ -22,12 +23,12 @@ logger = get_logger()
 
 
 class Deepgram:
-    def __init__(self, summarize, diarize, upload, output_dir):
+    def __init__(self, summarize, diarize, upload, data_writer: DataWriter):
         self.summarize = summarize
         self.diarize = diarize
         self.upload = upload
-        self.output_dir = output_dir
-        self.dev_mode = False # Extra capabilities during development mode
+        self.data_writer = data_writer
+        self.dev_mode = False  # Extra capabilities during development mode
 
     def audio_to_text(self, audio_file):
         logger.info("Transcribing audio to text using deepgram...")
@@ -55,8 +56,8 @@ class Deepgram:
             raise Exception(f"(deepgram) Error transcribing audio to text: {e}")
 
     def write_to_json_file(self, transcription_service_output, transcript: Transcript):
-        transcription_service_output_file = utils.write_to_json(
-            transcription_service_output, f"{self.output_dir}/{transcript.source.loc}", transcript.title, is_metadata=True)
+        transcription_service_output_file = self.data_writer.write_json(
+            data=transcription_service_output, file_path=transcript.output_path_with_title, filename='deepgram')
         logger.info(
             f"(deepgram) Model output stored at: {transcription_service_output_file}")
 
@@ -66,7 +67,8 @@ class Deepgram:
             with open(transcript.metadata_file, 'r') as file:
                 data = json.load(file)
             # Add deepgram output
-            data['deepgram_output'] = os.path.basename(transcription_service_output_file)
+            data['deepgram_output'] = os.path.basename(
+                transcription_service_output_file)
             # Write the updated dictionary back to the JSON file
             with open(transcript.metadata_file, 'w') as file:
                 json.dump(data, file, indent=4)
@@ -199,13 +201,14 @@ class Deepgram:
             Helper method to check if a Sentence is broken.
             Sentence is broken if the last character of the sentence is not one of the accepted punctuation marks.
             """
-            confidence_threshold = 0.0 # 0.0 means that confidence_threshold is disabled
+            confidence_threshold = 0.0  # 0.0 means that confidence_threshold is disabled
             last_char = last_sentence_current["transcript"][-1]
             if last_char not in ['.', '?', ',', '…']:
-                confidence_difference = abs(last_sentence_current["words"][-1]["speaker_confidence"] - first_sentence_next["words"][0]["speaker_confidence"])
+                confidence_difference = abs(
+                    last_sentence_current["words"][-1]["speaker_confidence"] - first_sentence_next["words"][0]["speaker_confidence"])
                 if confidence_difference > confidence_threshold:
                     return True
-            
+
             return False
 
         def update_segment_attributes(segment: SpeakerSegmentWithSentences):
@@ -216,8 +219,9 @@ class Deepgram:
             """
             if segment["sentences"]:
                 # Update the transcript by concatenating all sentence transcripts
-                segment["transcript"] = ' '.join(sentence["transcript"] for sentence in segment["sentences"])
-                
+                segment["transcript"] = ' '.join(
+                    sentence["transcript"] for sentence in segment["sentences"])
+
                 # Update the start and end times based on the sentences
                 segment["start"] = segment["sentences"][0]["start"]
                 segment["end"] = segment["sentences"][-1]["end"]
@@ -231,7 +235,8 @@ class Deepgram:
             location and degree of modification when sentences are combined due to the broken sentence heuristic.
             """
             # Calculate the speaker confidence difference
-            confidence_difference = abs(last_sentence_current["words"][-1]["speaker_confidence"] - first_sentence_next["words"][0]["speaker_confidence"])
+            confidence_difference = abs(
+                last_sentence_current["words"][-1]["speaker_confidence"] - first_sentence_next["words"][0]["speaker_confidence"])
             # Create a band-aid word entry
             band_aid_word = {
                 "punctuated_word": "[bs={:.3f}]".format(confidence_difference),
@@ -258,9 +263,11 @@ class Deepgram:
                     }
                     # Add the band-aid word if in dev mode
                     if self.dev_mode:
-                        band_aid_word = add_band_aid_word(last_sentence_current, first_sentence_next)
+                        band_aid_word = add_band_aid_word(
+                            last_sentence_current, first_sentence_next)
                         # Insert the band-aid word at the junction of the two sentences
-                        combined_sentence["words"] = last_sentence_current["words"] + [band_aid_word] + first_sentence_next["words"]
+                        combined_sentence["words"] = last_sentence_current["words"] + \
+                            [band_aid_word] + first_sentence_next["words"]
 
                     # Determine which segment is longer
                     if last_sentence_current["end"] - last_sentence_current["start"] > first_sentence_next["end"] - first_sentence_next["start"]:
@@ -284,7 +291,8 @@ class Deepgram:
                 i += 1
 
         # Remove any empty speaker segments from the list
-        speaker_segments_with_sentences = [segment for segment in speaker_segments_with_sentences if segment["sentences"]]
+        speaker_segments_with_sentences = [
+            segment for segment in speaker_segments_with_sentences if segment["sentences"]]
 
         # Merge consecutive segments with the same speaker
         i = 0
@@ -292,7 +300,8 @@ class Deepgram:
             current_segment = speaker_segments_with_sentences[i]
             next_segment = speaker_segments_with_sentences[i + 1]
             if current_segment["speaker"] == next_segment["speaker"]:
-                current_segment["transcript"] += " " + next_segment["transcript"]
+                current_segment["transcript"] += " " + \
+                    next_segment["transcript"]
                 current_segment["end"] = next_segment["end"]
                 current_segment["sentences"].extend(next_segment["sentences"])
                 speaker_segments_with_sentences.pop(i + 1)
@@ -322,9 +331,11 @@ class Deepgram:
                 if num_words == 0:
                     return final_sentence
 
-                current_confidence = round(sentence["words"][0]["speaker_confidence"], 3)
+                current_confidence = round(
+                    sentence["words"][0]["speaker_confidence"], 3)
                 for i, word in enumerate(sentence["words"]):
-                    next_confidence = round(sentence["words"][i + 1]["speaker_confidence"], 3) if i + 1 < num_words else None
+                    next_confidence = round(
+                        sentence["words"][i + 1]["speaker_confidence"], 3) if i + 1 < num_words else None
 
                     final_sentence += word["punctuated_word"]
 
@@ -344,7 +355,6 @@ class Deepgram:
                 return construct_sentence_with_confidence_annotations(sentence)
             else:
                 return " ".join(word["punctuated_word"] for word in sentence["words"])
-        
 
         try:
             final_transcript = ""
@@ -366,11 +376,13 @@ class Deepgram:
                             final_transcript += "\n" if not first_sentence else ""
                             final_transcript += f"## {chapter_title}\n\n"
                             if not single_speaker and not first_sentence:
-                                final_transcript += add_timestamp(speaker_id, chapter_start_time)
+                                final_transcript += add_timestamp(
+                                    speaker_id, chapter_start_time)
                             chapter_index += 1
 
                     if not single_speaker and first_sentence:
-                        final_transcript += add_timestamp(speaker_id, sentence_start)
+                        final_transcript += add_timestamp(
+                            speaker_id, sentence_start)
 
                     # Add the band-aid word if in dev mode
                     if self.dev_mode:
