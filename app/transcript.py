@@ -397,7 +397,7 @@ class RSS(Source):
         for entry in rss.entries:
             enclosure = next(
                 (link for link in entry.links if link.get('rel') == 'enclosure'), None)
-            if enclosure.type in ['audio/mpeg', 'audio/wav', 'audio/x-m4a']:
+            if enclosure.type in ['audio/mpeg', 'audio/wav', 'audio/x-m4a','audio/mp4']:
                 published_date = date(*entry.published_parsed[:3])
                 source = Audio(Source(enclosure.href, self.loc, self.local, entry.title, published_date, self.tags,
                                self.category, self.speakers, self.preprocess, link=entry.link), description=entry.description)

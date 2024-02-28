@@ -201,6 +201,8 @@ class Transcription:
         loc="misc",
         title=None,
         date=None,
+        # cutoff_date serves as a threshold, and only content published beyond this point is relevant
+        cutoff_date=None,
         tags=[],
         category=[],
         speakers=[],
@@ -212,6 +214,11 @@ class Transcription:
         excluded_media=[]
     ):
         """Add a source for transcription"""
+        if cutoff_date:
+            cutoff_date = utils.validate_and_parse_date(cutoff_date)
+            # Even with a cutoff date, for YouTube playlists we still need to download the metadata
+            # for each video in order to obtain the `upload_date` and use it for filtering
+            self.logger.info(f"A cutoff date of '{cutoff_date}' is given. Processing sources published after this date.")
         preprocess = False if self.test_mode else preprocess
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
@@ -235,27 +242,29 @@ class Transcription:
         if source.type == "playlist":
             # add a transcript for each source/video in the playlist
             for video in source.videos:
-                if video.media not in excluded_media:
-                    transcription_sources['added'].append(video)
+                is_eligible = video.date > cutoff_date if cutoff_date else True
+                if video.media not in excluded_media and is_eligible:
+                    transcription_sources['added'].append(video.source_file)
                     self._new_transcript_from_source(video)
                 else:
-                    transcription_sources['exist'].append(video)
+                    transcription_sources['exist'].append(video.source_file)
         elif source.type == 'rss':
             # add a transcript for each source/audio in the rss feed
             for entry in source.entries:
-                if entry.media not in excluded_media:
-                    transcription_sources['added'].append(entry)
+                is_eligible = entry.date > cutoff_date if cutoff_date else True
+                if entry.media not in excluded_media and is_eligible:
+                    transcription_sources['added'].append(entry.source_file)
                     self._new_transcript_from_source(entry)
                 else:
-                    transcription_sources['exist'].append(entry)
+                    transcription_sources['exist'].append(entry.source_file)
         elif source.type in ['audio', 'video']:
             if source.media not in excluded_media:
-                transcription_sources['added'].append(source)
+                transcription_sources['added'].append(source.source_file)
                 self._new_transcript_from_source(source)
                 self.logger.info(
                     f"Source added for transcription: {source.title}")
             else:
-                transcription_sources['exist'].append(source)
+                transcription_sources['exist'].append(source.source_file)
                 self.logger.info(f"Source already exists: {source.title}")
         else:
             raise Exception(f"Invalid source: {source_file}")
@@ -290,7 +299,8 @@ class Transcription:
                 chapters=metadata["chapters"],
                 link=metadata["media"],
                 excluded_media=metadata["excluded_media"],
-                nocheck=nocheck
+                nocheck=nocheck,
+                cutoff_date=metadata["cutoff_date"]
             )
 
     def start(self, test_transcript=None):

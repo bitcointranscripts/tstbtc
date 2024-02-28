@@ -89,6 +89,15 @@ summarize = click.option(
     default=False,
     help="Summarize the transcript [only available with deepgram]",
 )
+cutoff_date = click.option(
+    "--cutoff-date",
+    type=str,
+    help=("Specify a cutoff date (in YYYY-MM-DD format) to process only sources "
+          "published after this date. Sources with a publication date on or before "
+          "the cutoff will be excluded from processing. This option is useful for "
+          "focusing on newer content or limiting the scope of processing to a "
+          "specific date range.")
+)
 github = click.option(
     "--github",
     type=click.Choice(["remote", "local", "none"]),
@@ -198,6 +207,8 @@ add_category = click.option(
 @add_speakers
 @add_category
 @add_loc
+# Options for configuring the transcription preprocess
+@cutoff_date
 # Options for configuring the transcription postprocess
 @github
 @upload_to_s3
@@ -228,6 +239,7 @@ def transcribe(
     noqueue: bool,
     markdown: bool,
     needs_review: bool,
+    cutoff_date: str,
 ) -> None:
     """Transcribe the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -265,7 +277,14 @@ def transcribe(
             transcription.add_transcription_source_JSON(source)
         else:
             transcription.add_transcription_source(
-                source_file=source, loc=loc, title=title, date=date, tags=list(tags), category=list(category), speakers=list(speakers),
+                source_file=source,
+                loc=loc,
+                title=title,
+                date=date,
+                tags=list(tags),
+                category=list(category),
+                speakers=list(speakers),
+                cutoff_date=cutoff_date
             )
         transcription.start()
         if nocleanup:
@@ -275,10 +294,13 @@ def transcribe(
     except Exception as e:
         logger.error(e)
         logger.info(f"Exited with error, not cleaning up temp files: {tmp_dir}")
+        traceback.print_exc()
 
 
 @cli.command()
 @click.argument("source", nargs=1)
+# Options for configuring the transcription preprocess
+@cutoff_date
 @click.option(
     "--nocheck",
     is_flag=True,
@@ -307,7 +329,8 @@ def preprocess(
     speakers: list,
     category: list,
     nocheck: bool,
-    no_batched_output: bool
+    no_batched_output: bool,
+    cutoff_date: str
 ):
     """Preprocess the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -335,7 +358,8 @@ def preprocess(
                 category=category,
                 speakers=speakers,
                 preprocess=True,
-                nocheck=nocheck
+                nocheck=nocheck,
+                cutoff_date=cutoff_date
             )
         if not no_batched_output:
             # Batch write all preprocessed sources to JSON
@@ -391,7 +415,8 @@ def postprocess(
             f"Postprocessing {service} transcript from {metadata_json_file}")
         with open(metadata_json_file, "r") as outfile:
             metadata_json = json.load(outfile)
-        metadata = utils.configure_metadata_given_from_JSON(metadata_json, from_json=metadata_json_file)
+        metadata = utils.configure_metadata_given_from_JSON(
+            metadata_json, from_json=metadata_json_file)
         transcription.add_transcription_source(
             source_file=metadata["source_file"],
             loc=metadata["loc"],
@@ -404,6 +429,7 @@ def postprocess(
             chapters=metadata["chapters"],
             link=metadata["media"],
             preprocess=False,
+            cutoff_date=metadata["cutoff_date"]
         )
         # Finalize transcription service output
         transcript_to_postprocess = transcription.transcripts[0]

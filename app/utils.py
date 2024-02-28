@@ -85,6 +85,7 @@ def configure_metadata_given_from_JSON(source, from_json=None):
         metadata["chapters"] = source.get("chapters", [])
         metadata["loc"] = source.get("loc", "")
         metadata["date"] = source.get("date", None)
+        metadata["cutoff_date"] = source.get("cutoff_date", None)
         metadata["youtube_metadata"] = source.get("youtube", None)
         metadata["media"] = source.get("media", None)
         excluded_media = source.get(
