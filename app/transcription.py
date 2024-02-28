@@ -373,8 +373,8 @@ class Transcription:
             meta_data += f"categories: {str(transcript.source.category)}\n"
             if transcript.summary:
                 meta_data += f"summary: {transcript.summary}\n"
-            if transcript.source.event_date:
-                meta_data += f"date: {transcript.source.event_date}\n"
+            if transcript.source.date:
+                meta_data += f"date: {transcript.source.date}\n"
             meta_data += "---\n"
             # Write to file
             markdown_file = f"{utils.configure_output_file_path(output_dir, transcript.title, add_timestamp=False)}.md"

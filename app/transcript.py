@@ -70,7 +70,7 @@ class Transcript:
         if not self.source.local:
             json_data["media"] = self.source.media
         if self.source.date:
-            json_data['date'] = self.source.date
+            json_data['date'] = self.source.date.isoformat()
 
         return json_data
 
@@ -109,24 +109,32 @@ class Source:
         return self.link if self.link is not None else self.source_file
 
     @property
-    def date(self):
+    def date(self) -> date:
         if self.event_date is None:
             return None
-        if type(self.event_date) is str:
+        # If event_date is already a datetime.date object, return it directly
+        elif isinstance(self.event_date, date):
             return self.event_date
-        else:
-            return self.event_date.strftime("%Y-%m-%d")
+        # TODO: This conversion from string to datetime.date is temporary.
+        # Once all date handling in the codebase is updated to use datetime.date objects,
+        # this conversion logic should be removed.
+        elif isinstance(self.event_date, str):
+            # Utilizing the validate_and_parse_date function to ensure the date string
+            # is valid and to convert it into a datetime.date object.
+            return utils.validate_and_parse_date(self.event_date)
 
-    def __config_event_date(self, date):
+    def __config_event_date(self, event_date):
         self.event_date = None
-        if date:
-            try:
-                if type(date) is str:
-                    self.event_date = datetime.strptime(date, "%Y-%m-%d").date()
-                else:
-                    self.event_date = date
-            except ValueError as e:
-                raise ValueError(f"Supplied date is invalid: {e}")
+        if event_date:
+            if isinstance(event_date, str):
+                self.event_date = utils.validate_and_parse_date(event_date)
+            elif isinstance(event_date, date):
+                # If date_input is already a datetime.date, assign it directly
+                self.event_date = event_date
+            else:
+                # Raise an error if date_input is neither a string nor a datetime.date
+                raise TypeError(
+                    "The date must be a string or datetime.date object.")
 
     def initialize(self):
         try:
@@ -214,12 +222,11 @@ class Audio(Source):
             'categories': self.category,
             'tags': self.tags,
             'speakers': self.speakers,
-            'date': self.date,
             'description': self.description,
             'chapters': self.chapters,
         }
         if self.date:
-            json_data['date'] = self.date
+            json_data['date'] = self.date.isoformat()
 
         return json_data
 
@@ -341,18 +348,17 @@ class Video(Source):
             'categories': self.category,
             'tags': self.tags,
             'speakers': self.speakers,
-            'date': self.date,
             'chapters': self.chapters,
             'youtube': self.youtube_metadata
         }
         if self.date:
-            json_data['date'] = self.date
+            json_data['date'] = self.date.isoformat(),
 
         return json_data
 
 
 class Playlist(Source):
-    def __init__(self, source, entries, preprocess=False):
+    def __init__(self, source, entries):
         try:
             # initialize source using a base Source
             super().__init__(source.source_file, source.loc, source.local, source.title, source.event_date,
@@ -363,7 +369,7 @@ class Playlist(Source):
 
     def __config_source(self, entries):
         self.type = "playlist"
-        self.videos = []
+        self.videos: Video = []
         for entry in entries:
             if entry["title"] != '[Private video]':
                 source = Video(source=Source(entry["url"], self.loc, self.local, entry["title"], self.event_date,

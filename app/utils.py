@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, date
 
 import requests
 
@@ -54,6 +54,20 @@ def check_if_valid_json(file_path):
 def check_if_valid_file_path(file_path):
     if not isinstance(file_path, str) or not os.path.isfile(file_path):
         raise Exception(f"Not a valid file: {file_path}")
+
+
+def validate_and_parse_date(date_str: str, expected_format: str = "%Y-%m-%d") -> date:
+    """
+    Validates that a given date string matches the expected date format and returns a date object.
+    If the date string does not match the format, an exception is raised.
+    """
+    try:
+        # Attempt to parse the date string using the expected format
+        return datetime.strptime(date_str, expected_format).date()
+    except ValueError:
+        # The date string did not match the expected format
+        raise Exception(
+            f"The provided date '{date_str}' does not match the expected format '{expected_format}'.")
 
 
 def configure_metadata_given_from_JSON(source, from_json=None):
