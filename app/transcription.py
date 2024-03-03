@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 
 from dotenv import dotenv_values
+import yaml
 import yt_dlp
 
 from app.transcript import (
@@ -201,6 +202,9 @@ class Transcription:
         loc="misc",
         title=None,
         date=None,
+        summary=None,
+        episode=None,
+        additional_resources=None,
         # cutoff_date serves as a threshold, and only content published beyond this point is relevant
         cutoff_date=None,
         tags=[],
@@ -218,7 +222,8 @@ class Transcription:
             cutoff_date = utils.validate_and_parse_date(cutoff_date)
             # Even with a cutoff date, for YouTube playlists we still need to download the metadata
             # for each video in order to obtain the `upload_date` and use it for filtering
-            self.logger.info(f"A cutoff date of '{cutoff_date}' is given. Processing sources published after this date.")
+            self.logger.info(
+                f"A cutoff date of '{cutoff_date}' is given. Processing sources published after this date.")
         preprocess = False if self.test_mode else preprocess
         transcription_sources = {"added": [], "exist": []}
         # check if source is a local file
@@ -232,11 +237,16 @@ class Transcription:
         if self.existing_media is not None:
             excluded_media.update(self.existing_media)
         # initialize source
+        # TODO: find a better way to pass metadata into the source
+        # as it is, every new metadata field needs to be passed to `Source`
+        # I can assign directly after initialization like I do with `additional_resources`
+        # but I'm not sure if it's the best way to do it.
         source = self._initialize_source(
-            source=Source(source_file, loc, local, title, date,
-                          tags, category, speakers, preprocess, link),
+            source=Source(source_file=source_file, loc=loc, local=local, title=title, date=date, summary=summary,
+                          episode=episode, tags=tags, category=category, speakers=speakers, preprocess=preprocess, link=link),
             youtube_metadata=youtube_metadata,
             chapters=chapters)
+        source.additional_resources = additional_resources
         self.logger.debug(f"Detected source: {source}")
 
         if source.type == "playlist":
@@ -295,6 +305,9 @@ class Transcription:
                 tags=metadata["tags"],
                 speakers=metadata["speakers"],
                 date=metadata["date"],
+                summary=metadata["summary"],
+                episode=metadata["episode"],
+                additional_resources=metadata["additional_resources"],
                 youtube_metadata=metadata["youtube_metadata"],
                 chapters=metadata["chapters"],
                 link=metadata["media"],
@@ -382,10 +395,21 @@ class Transcription:
             meta_data += f"speakers: {str(transcript.source.speakers)}\n"
             meta_data += f"categories: {str(transcript.source.category)}\n"
             if transcript.summary:
-                meta_data += f"summary: {transcript.summary}\n"
+                meta_data += f'summary: "{transcript.summary}"\n'
+            if transcript.source.episode:
+                meta_data += f"episode: {transcript.source.episode}\n"
             if transcript.source.date:
                 meta_data += f"date: {transcript.source.date}\n"
+
+            # Serialize additional_resources to YAML and add to meta_data
+            if transcript.source.additional_resources:
+                meta_data += "additional_resources:\n"
+                for resource in transcript.source.additional_resources:
+                    meta_data += yaml.dump([resource], sort_keys=False,
+                                           default_flow_style=False, indent=4)
+
             meta_data += "---\n"
+
             # Write to file
             markdown_file = f"{utils.configure_output_file_path(output_dir, transcript.title, add_timestamp=False)}.md"
             with open(markdown_file, "w") as opf:
