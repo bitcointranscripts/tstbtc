@@ -56,24 +56,29 @@ class Deepgram:
             raise Exception(f"(deepgram) Error transcribing audio to text: {e}")
 
     def write_to_json_file(self, transcription_service_output, transcript: Transcript):
-        transcription_service_output_file = self.data_writer.write_json(
-            data=transcription_service_output, file_path=transcript.output_path_with_title, filename='deepgram')
-        logger.info(
-            f"(deepgram) Model output stored at: {transcription_service_output_file}")
+        try:
+            transcription_service_output_file = self.data_writer.write_json(
+                data=transcription_service_output, file_path=transcript.output_path_with_title, filename='deepgram')
+            logger.info(
+                f"(deepgram) Model output stored at: {transcription_service_output_file}")
 
-        # Add deepgram output file path to transcript's metadata file
-        if transcript.metadata_file is not None:
-            # Read existing content of the metadata file
-            with open(transcript.metadata_file, 'r') as file:
-                data = json.load(file)
-            # Add deepgram output
-            data['deepgram_output'] = os.path.basename(
-                transcription_service_output_file)
-            # Write the updated dictionary back to the JSON file
-            with open(transcript.metadata_file, 'w') as file:
-                json.dump(data, file, indent=4)
+            # Add deepgram output file path to transcript's metadata file
+            if transcript.metadata_file is not None:
+                # Read existing content of the metadata file
+                with open(transcript.metadata_file, 'r') as file:
+                    data = json.load(file)
+                # Add deepgram output
+                data['deepgram_output'] = os.path.basename(
+                    transcription_service_output_file)
+                # Write the updated dictionary back to the JSON file
+                with open(transcript.metadata_file, 'w') as file:
+                    json.dump(data, file, indent=4)
 
-        return transcription_service_output_file
+            return transcription_service_output_file
+        except Exception as e:
+            logger.error(
+                f"(deepgram) Error writing JSON file for {transcript.title}: {e}")
+            raise
 
     def process_summary(self, transcript: Transcript):
         with open(transcript.transcription_service_output_file, "r") as outfile:
@@ -128,36 +133,42 @@ class Deepgram:
         abbreviation_pattern = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)'
         sentence_end_pattern = r'(?<=\.|\?|…|-)\s'
         sentence_split_pattern = f'{abbreviation_pattern}{sentence_end_pattern}'
+        try:
 
-        for segment in segments:
-            # Split the segment into sentences
-            sentences = re.split(sentence_split_pattern, segment["transcript"])
+            for segment in segments:
+                # Split the segment into sentences
+                sentences = re.split(sentence_split_pattern,
+                                     segment["transcript"])
 
-            segment_data = {
-                "speaker": segment["speaker"],
-                "transcript": segment["transcript"],
-                "start": segment["start"],
-                "end": segment["end"],
-                "sentences": []
-            }
-
-            word_index = 0
-
-            for sentence in sentences:
-                sentence_words = sentence.split()
-                sentence_data = {
-                    "transcript": sentence,
-                    "start": segment["words"][word_index]["start"],
-                    "end": segment["words"][word_index + len(sentence_words) - 1]["end"],
-                    "words": segment["words"][word_index:word_index+len(sentence_words)]
+                segment_data = {
+                    "speaker": segment["speaker"],
+                    "transcript": segment["transcript"],
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "sentences": []
                 }
 
-                word_index += len(sentence_words)
-                segment_data["sentences"].append(sentence_data)
+                word_index = 0
 
-            result.append(segment_data)
+                for sentence in sentences:
+                    sentence_words = sentence.split()
+                    sentence_data = {
+                        "transcript": sentence,
+                        "start": segment["words"][word_index]["start"],
+                        "end": segment["words"][word_index + len(sentence_words) - 1]["end"],
+                        "words": segment["words"][word_index:word_index+len(sentence_words)]
+                    }
 
-        return result
+                    word_index += len(sentence_words)
+                    segment_data["sentences"].append(sentence_data)
+
+                result.append(segment_data)
+
+            return result
+        except Exception as e:
+            logger.error(
+                f"(deepgram) Error breaking segments into sentences: {e}")
+            raise
 
     def adjust_chapter_timestamps(self, speaker_segements_with_sentences, chapters):
         """Adjust the given chapter timestamps to prevent mid-sentence line break"""
@@ -174,21 +185,25 @@ class Deepgram:
 
         adjusted_chapters = []
 
-        for chapter in chapters:
-            chapter_start_time = chapter[1]
-            chapter_sentence = find_sentence_for_timestamp(
-                speaker_segements_with_sentences, chapter_start_time)
+        try:
+            for chapter in chapters:
+                chapter_start_time = chapter[1]
+                chapter_sentence = find_sentence_for_timestamp(
+                    speaker_segements_with_sentences, chapter_start_time)
 
-            if chapter_sentence:
-                adjusted_start_time = adjust_timestamp(
-                    chapter_start_time, chapter_sentence["start"], chapter_sentence["end"])
-                adjusted_chapter = [chapter[0],
-                                    adjusted_start_time] + chapter[2:]
-                adjusted_chapters.append(adjusted_chapter)
-            else:
-                adjusted_chapters.append(chapter)
+                if chapter_sentence:
+                    adjusted_start_time = adjust_timestamp(
+                        chapter_start_time, chapter_sentence["start"], chapter_sentence["end"])
+                    adjusted_chapter = [chapter[0],
+                                        adjusted_start_time] + chapter[2:]
+                    adjusted_chapters.append(adjusted_chapter)
+                else:
+                    adjusted_chapters.append(chapter)
 
-        return adjusted_chapters
+            return adjusted_chapters
+        except Exception as e:
+            logger.error(f"(deepgram) Error adjusting chapter timestamps: {e}")
+            raise
 
     def fix_broken_sentences(self, speaker_segments_with_sentences: list[SpeakerSegmentWithSentences]) -> list[SpeakerSegmentWithSentences]:
         """
@@ -244,71 +259,76 @@ class Deepgram:
             }
             return band_aid_word
 
-        i = 0
-        while i < len(speaker_segments_with_sentences) - 1:
-            current_segment = speaker_segments_with_sentences[i]
-            next_segment = speaker_segments_with_sentences[i + 1]
+        try:
+            i = 0
+            while i < len(speaker_segments_with_sentences) - 1:
+                current_segment = speaker_segments_with_sentences[i]
+                next_segment = speaker_segments_with_sentences[i + 1]
 
-            if current_segment["sentences"]:
-                last_sentence_current = current_segment["sentences"][-1]
-                first_sentence_next = next_segment["sentences"][0]
+                if current_segment["sentences"]:
+                    last_sentence_current = current_segment["sentences"][-1]
+                    first_sentence_next = next_segment["sentences"][0]
 
-                if sentence_is_broken(last_sentence_current, first_sentence_next):
-                    combined_sentence = {
-                        "transcript": last_sentence_current["transcript"] + ' ' + first_sentence_next["transcript"],
-                        "start": last_sentence_current["start"],
-                        "end": first_sentence_next["end"],
-                        "words": last_sentence_current["words"] + first_sentence_next["words"],
-                        "fixed_by_heuristic": "broken-sentence"
-                    }
-                    # Add the band-aid word if in dev mode
-                    if self.dev_mode:
-                        band_aid_word = add_band_aid_word(
-                            last_sentence_current, first_sentence_next)
-                        # Insert the band-aid word at the junction of the two sentences
-                        combined_sentence["words"] = last_sentence_current["words"] + \
-                            [band_aid_word] + first_sentence_next["words"]
+                    if sentence_is_broken(last_sentence_current, first_sentence_next):
+                        combined_sentence = {
+                            "transcript": last_sentence_current["transcript"] + ' ' + first_sentence_next["transcript"],
+                            "start": last_sentence_current["start"],
+                            "end": first_sentence_next["end"],
+                            "words": last_sentence_current["words"] + first_sentence_next["words"],
+                            "fixed_by_heuristic": "broken-sentence"
+                        }
+                        # Add the band-aid word if in dev mode
+                        if self.dev_mode:
+                            band_aid_word = add_band_aid_word(
+                                last_sentence_current, first_sentence_next)
+                            # Insert the band-aid word at the junction of the two sentences
+                            combined_sentence["words"] = last_sentence_current["words"] + \
+                                [band_aid_word] + first_sentence_next["words"]
 
-                    # Determine which segment is longer
-                    if last_sentence_current["end"] - last_sentence_current["start"] > first_sentence_next["end"] - first_sentence_next["start"]:
-                        # Attribute the broken sentence to the current speaker
-                        current_segment["sentences"][-1] = combined_sentence
-                        # Remove the first sentence of the next segment
-                        next_segment["sentences"].pop(0)
-                    else:
-                        # Attribute the broken sentence to the next speaker
-                        next_segment["sentences"][0] = combined_sentence
-                        # Remove the last sentence of the current segment
-                        current_segment["sentences"].pop()
+                        # Determine which segment is longer
+                        if last_sentence_current["end"] - last_sentence_current["start"] > first_sentence_next["end"] - first_sentence_next["start"]:
+                            # Attribute the broken sentence to the current speaker
+                            current_segment["sentences"][-1] = combined_sentence
+                            # Remove the first sentence of the next segment
+                            next_segment["sentences"].pop(0)
+                        else:
+                            # Attribute the broken sentence to the next speaker
+                            next_segment["sentences"][0] = combined_sentence
+                            # Remove the last sentence of the current segment
+                            current_segment["sentences"].pop()
 
-                    update_segment_attributes(current_segment)
-                    update_segment_attributes(next_segment)
+                        update_segment_attributes(current_segment)
+                        update_segment_attributes(next_segment)
 
-            # Check if next_segment is empty and remove it if it is
-            if not next_segment["sentences"]:
-                speaker_segments_with_sentences.pop(i + 1)
-            else:
-                i += 1
+                # Check if next_segment is empty and remove it if it is
+                if not next_segment["sentences"]:
+                    speaker_segments_with_sentences.pop(i + 1)
+                else:
+                    i += 1
 
-        # Remove any empty speaker segments from the list
-        speaker_segments_with_sentences = [
-            segment for segment in speaker_segments_with_sentences if segment["sentences"]]
+            # Remove any empty speaker segments from the list
+            speaker_segments_with_sentences = [
+                segment for segment in speaker_segments_with_sentences if segment["sentences"]]
 
-        # Merge consecutive segments with the same speaker
-        i = 0
-        while i < len(speaker_segments_with_sentences) - 1:
-            current_segment = speaker_segments_with_sentences[i]
-            next_segment = speaker_segments_with_sentences[i + 1]
-            if current_segment["speaker"] == next_segment["speaker"]:
-                current_segment["transcript"] += " " + \
-                    next_segment["transcript"]
-                current_segment["end"] = next_segment["end"]
-                current_segment["sentences"].extend(next_segment["sentences"])
-                speaker_segments_with_sentences.pop(i + 1)
-            else:
-                i += 1
+            # Merge consecutive segments with the same speaker
+            i = 0
+            while i < len(speaker_segments_with_sentences) - 1:
+                current_segment = speaker_segments_with_sentences[i]
+                next_segment = speaker_segments_with_sentences[i + 1]
+                if current_segment["speaker"] == next_segment["speaker"]:
+                    current_segment["transcript"] += " " + \
+                        next_segment["transcript"]
+                    current_segment["end"] = next_segment["end"]
+                    current_segment["sentences"].extend(
+                        next_segment["sentences"])
+                    speaker_segments_with_sentences.pop(i + 1)
+                else:
+                    i += 1
 
-        return speaker_segments_with_sentences
+            return speaker_segments_with_sentences
+        except Exception as e:
+            logger.error(f"(deepgram) Error fixing broken sentences: {e}")
+            raise
 
     def construct_transcript(self, speaker_segments: list[SpeakerSegmentWithSentences], chapters):
         def add_timestamp(speaker, timestamp):
