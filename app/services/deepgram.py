@@ -5,6 +5,7 @@ import re
 
 import deepgram
 from dotenv import dotenv_values
+import librosa
 
 from app import (
     application,
@@ -12,6 +13,7 @@ from app import (
 )
 from app.data_writer import DataWriter
 from app.logging import get_logger
+from app.media_processor import MediaProcessor
 from app.transcript import Transcript
 from app.types import (
     Sentence,
@@ -29,6 +31,8 @@ class Deepgram:
         self.upload = upload
         self.data_writer = data_writer
         self.dev_mode = False  # Extra capabilities during development mode
+        self.max_audio_length = 3600.0  # 60 minutes in seconds
+        self.processor = MediaProcessor(chunk_length=1200.0)
 
     def audio_to_text(self, audio_file):
         logger.info("Transcribing audio to text using deepgram...")
@@ -443,10 +447,138 @@ class Deepgram:
         except Exception as e:
             raise Exception(f"(deepgram) Error finalizing transcript: {e}")
 
+    def combine_chunk_outputs(self, all_chunks_output, overlap):
+        combined_output = {
+            "results": {
+                "channels": [{
+                    "alternatives": [{
+                        "words": []
+                    }]
+                }]
+            },
+            "metadata": []  # Initialize metadata as an empty array
+        }
+
+        # Add summaries field if self.summarize is True
+        if self.summarize:
+            combined_output["results"]["channels"][0]["alternatives"][0]["summaries"] = [
+            ]
+
+        global_speaker_mapping = {}
+        global_speaker_counter = 0
+        previous_words = []
+        total_offset = 0
+
+        for chunk_index, chunk_output in enumerate(all_chunks_output):
+            words = chunk_output["results"]["channels"][0]["alternatives"][0]["words"]
+            metadata = chunk_output.get("metadata", {})
+
+            # Adjust word timestamps based on the total offset
+            for word in words:
+                word["start"] += total_offset
+                word["end"] += total_offset
+
+            # Calculate chunk_end based on the last word's end time
+            chunk_end = words[-1]["end"] if words else 0
+
+            # Create a local to global speaker mapping for the current chunk
+            local_to_global_speaker_mapping = {}
+
+            # Use overlap to match speakers between chunks
+            if previous_words:
+                for prev_word in previous_words:
+                    for curr_word in words:
+                        if abs(prev_word["start"] - curr_word["start"]) < overlap:
+                            local_speaker = curr_word["speaker"]
+                            if local_speaker not in local_to_global_speaker_mapping:
+                                if local_speaker not in global_speaker_mapping:
+                                    global_speaker_mapping[local_speaker] = global_speaker_counter
+                                    global_speaker_counter += 1
+                                local_to_global_speaker_mapping[local_speaker] = global_speaker_mapping[local_speaker]
+                            curr_word["speaker"] = local_to_global_speaker_mapping[local_speaker]
+
+            for word in words:
+                local_speaker = word["speaker"]
+                if local_speaker not in local_to_global_speaker_mapping:
+                    if local_speaker not in global_speaker_mapping:
+                        global_speaker_mapping[local_speaker] = global_speaker_counter
+                        global_speaker_counter += 1
+                    local_to_global_speaker_mapping[local_speaker] = global_speaker_mapping[local_speaker]
+
+                global_speaker = local_to_global_speaker_mapping[local_speaker]
+                word["speaker"] = global_speaker
+
+            # Remove overlapping words from the current chunk's words list
+            non_overlap_words = [
+                word for word in words if word["end"] >= (total_offset + overlap if chunk_index != 0 else 0)]
+            combined_output["results"]["channels"][0]["alternatives"][0]["words"].extend(
+                non_overlap_words)
+
+            # Append the metadata of the current chunk
+            combined_output["metadata"].append(metadata)
+
+            if self.summarize:
+                summaries = chunk_output["results"]["channels"][0]["alternatives"][0].get(
+                    "summaries", [])
+                combined_output["results"]["channels"][0]["alternatives"][0]["summaries"].extend(
+                    summaries)
+
+            # Update the total offset for the next chunk
+            total_offset += self.processor.chunk_length - overlap
+
+            # Update previous_words to the last words of the current chunk within the overlap duration
+            previous_words = [
+                word for word in words if word["end"] > total_offset]
+
+        return combined_output
+
+    def transcribe_in_chunks(self, transcript: Transcript):
+        logger.info(
+            f"Audio file is longer than {self.max_audio_length / 60} minutes. Splitting into chunks.")
+
+        # Split audio into chunks
+        overlap_between_chunks = 30.0
+        chunk_files = self.processor.split_audio(
+            transcript.audio_file, overlap=overlap_between_chunks)
+
+        all_chunks_output = []
+        deepgram_chunks = []
+        for i, chunk_file in enumerate(chunk_files):
+            chunk_output = self.audio_to_text(chunk_file)
+            all_chunks_output.append(chunk_output)
+
+            # Write intermediate deepgram output to JSON file
+            filename = f"deepgram_chunk_{i + 1}_of_{len(chunk_files)}"
+            result = self.data_writer.write_json(
+                data=chunk_output, file_path=transcript.output_path_with_title, filename=filename)
+            deepgram_chunks.append(os.path.basename(result))
+
+        # Combine all chunk outputs into a single output
+        transcription_service_output = self.combine_chunk_outputs(
+            all_chunks_output, overlap=overlap_between_chunks)
+
+        # Update transcript's metadata file with chunk filenames
+        if transcript.metadata_file is not None:
+            with open(transcript.metadata_file, 'r') as file:
+                data = json.load(file)
+            data['deepgram_chunks'] = deepgram_chunks
+            with open(transcript.metadata_file, 'w') as file:
+                json.dump(data, file, indent=4)
+
+        return transcription_service_output
+
     def transcribe(self, transcript: Transcript):
         try:
-            transcription_service_output = self.audio_to_text(
-                transcript.audio_file)
+            audio_duration = librosa.get_duration(
+                path=transcript.audio_file)
+            transcription_service_output = {}
+
+            if audio_duration > self.max_audio_length:
+                transcription_service_output = self.transcribe_in_chunks(transcript)
+            else:
+                transcription_service_output = self.audio_to_text(
+                    transcript.audio_file)
+
             transcript.transcription_service_output_file = self.write_to_json_file(
                 transcription_service_output, transcript)
             if self.upload:
