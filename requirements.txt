@@ -1,7 +1,6 @@
 openai-whisper==20230314
 Click==8.1.3
 clint==0.5.1
-moviepy==1.0.3
 pytest==7.2.1
 python-dotenv==1.0.0
 pytube==12.1.2

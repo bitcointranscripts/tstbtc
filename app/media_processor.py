@@ -3,14 +3,35 @@ import soundfile as sf
 import os
 import ffmpeg
 
-from app.logging import get_logger
+from app import (
+    logging,
+    utils
+)
 
-logger = get_logger()
+logger = logging.get_logger()
 
 
 class MediaProcessor:
     def __init__(self, chunk_length=1200.0):
         self.chunk_length = chunk_length
+
+    def initialize_ffmpeg(self):
+        # Check if ffmpeg is available
+        try:
+            ffmpeg.probe('')
+            logger.debug("FFMPEG is already available in the system PATH.")
+        except ffmpeg.Error:
+            try:
+                logger.debug("Initializing FFMPEG...")
+                import static_ffmpeg
+                static_ffmpeg.add_paths()
+                logger.debug("Initialized FFMPEG")
+            except ImportError:
+                logger.debug(
+                    "static_ffmpeg not found, assuming ffmpeg is available system-wide")
+            except Exception as e:
+                logger.error(f"Error initializing FFMPEG: {e}")
+                raise Exception("Error initializing FFMPEG")
 
     def split_audio(self, audio_path, output_dir=None, overlap=0):
         # Set default output directory if not provided
@@ -51,10 +72,17 @@ class MediaProcessor:
     def convert_to_mp3(self, input_path, output_path=None):
         if output_path is None:
             output_path = os.path.splitext(input_path)[0] + ".mp3"
+        else:
+            filename = os.path.splitext(os.path.basename(input_path))[0]
+            output_path = os.path.abspath(os.path.join(
+                output_path, f"{utils.slugify(filename)}.mp3"))
 
-        print(f"Converting {input_path} to {output_path}")
+        logger.info(f"Converting {input_path} to {output_path}")
+        self.initialize_ffmpeg()
         try:
             ffmpeg.input(input_path).output(output_path, format='mp3').run()
-            print(f"Successfully converted to {output_path}")
+            logger.info(f"Successfully converted {input_path} to {output_path}")
+            return output_path
         except ffmpeg.Error as e:
-            print(f"Error converting file: {e}")
+            logger.error(f"Error converting {input_path} to mp3: {e}")
+            raise Exception(f"Error converting {input_path} to mp3: {e}")

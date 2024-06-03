@@ -1,9 +1,7 @@
 """This module provides the transcript cli."""
 import errno
 import logging
-import os
 import shutil
-import subprocess
 
 import boto3
 from dotenv import dotenv_values
@@ -12,20 +10,6 @@ from app import __app_name__, __version__
 from app.logging import get_logger
 
 logger = get_logger()
-
-
-def convert_wav_to_mp3(abs_path, filename, working_dir="tmp/"):
-    logger = logging.getLogger(__app_name__)
-    logger.info(f"Converting {abs_path} to mp3...")
-    op = subprocess.run(
-        ["ffmpeg", "-i", abs_path, filename[:-4] + ".mp3"],
-        cwd=working_dir,
-        capture_output=True,
-        text=True,
-    )
-    logger.info(op.stdout)
-    logger.error(op.stderr)
-    return os.path.abspath(os.path.join(working_dir, filename[:-4] + ".mp3"))
 
 
 def clean_up(tmp_dir):

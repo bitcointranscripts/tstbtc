@@ -15,15 +15,14 @@ import requests
 import static_ffmpeg
 import yt_dlp
 from clint.textui import progress
-from moviepy.editor import VideoFileClip
 
 from app import (
     __app_name__,
     __version__,
-    application,
     logging,
     utils
 )
+from app.media_processor import MediaProcessor
 
 logger = logging.get_logger()
 
@@ -196,7 +195,8 @@ class Audio(Source):
             self.description = description
             self.chapters = chapters
             if self.title is None:
-                os.path.splitext(os.path.basename(self.source_file))[0]
+                self.title = os.path.splitext(
+                    os.path.basename(self.source_file))[0]
         except Exception as e:
             raise Exception(f"Error during Audio creation: {e}")
 
@@ -234,20 +234,17 @@ class Audio(Source):
             self.logger.info(f"Audio processing: '{self.source_file}'")
             if not self.local:
                 # download audio file from the internet
-                abs_path = download_audio()
-                self.logger.info(f"Audio file stored in: {abs_path}")
+                audio_file_path = download_audio()
+                self.logger.info(f"Audio file stored in: {audio_file_path}")
             else:
                 # calculate the absolute path of the local audio file
-                filename = self.source_file.split("/")[-1]
-                abs_path = os.path.abspath(self.source_file)
-            filename = os.path.basename(abs_path)
-            if filename.endswith("wav"):
-                self.initialize()
-                abs_path = application.convert_wav_to_mp3(
-                    abs_path=abs_path, filename=filename, working_dir=working_dir
-                )
+                audio_file_path = os.path.abspath(self.source_file)
+            if not audio_file_path.endswith(".mp3"):
+                media_processor = MediaProcessor()
+                audio_file_path = media_processor.convert_to_mp3(
+                    audio_file_path, working_dir)
             # return the audio file that is now ready for transcription
-            return abs_path
+            return audio_file_path
 
         except Exception as e:
             raise Exception(f"Error processing audio file: {e}")
@@ -346,28 +343,16 @@ class Video(Source):
                 self.logger.error(e)
                 raise Exception(f"Error downloading video: {e}")
 
-        def convert_video_to_mp3(video_file):
-            try:
-                self.logger.info(f"Converting {video_file} to mp3...")
-                clip = VideoFileClip(video_file)
-                output_file = os.path.join(
-                    working_dir, f"{utils.slugify(self.title)}.mp3")
-                clip.audio.write_audiofile(output_file)
-                clip.close()
-                self.logger.info("Video converted to mp3")
-                return output_file
-            except Exception as e:
-                raise Exception(f"Error converting video to mp3: {e}")
-
         try:
             self.logger.info(f"Video processing: '{self.source_file}'")
             if not self.local:
-                abs_path = download_video()
+                video_file_path = download_video()
             else:
-                abs_path = os.path.abspath(self.source_file)
+                video_file_path = os.path.abspath(self.source_file)
 
-            self.initialize()
-            audio_file = convert_video_to_mp3(abs_path)
+            media_processor = MediaProcessor()
+            audio_file = media_processor.convert_to_mp3(
+                video_file_path, working_dir)
             return audio_file
 
         except Exception as e:
