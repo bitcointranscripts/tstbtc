@@ -30,6 +30,7 @@ from app.types import (
     GitHubMode,
 )
 from app.data_writer import DataWriter
+from app.data_fetcher import DataFetcher
 
 
 class Transcription:
@@ -74,6 +75,7 @@ class Transcription:
         self.queuer = Queuer(test_mode=test_mode) if queue is True else None
         self.existing_media = None
         self.preprocessing_output = [] if batch_preprocessing_output else None
+        self.data_fetcher = DataFetcher(base_url="http://btctranscripts.com")
 
         self.logger.info(f"Temp directory: {self.tmp_dir}")
 
@@ -231,7 +233,7 @@ class Transcription:
         if os.path.isfile(source_file):
             local = True
         if not nocheck and not local and self.existing_media is None and not self.test_mode:
-            self.existing_media = utils.get_existing_media()
+            self.existing_media = self.data_fetcher.get_existing_media()
         # combine existing media from btctranscripts.com with excluded media given from source
         excluded_media = {value: True for value in excluded_media}
         if self.existing_media is not None:
@@ -275,7 +277,7 @@ class Transcription:
                     f"Source added for transcription: {source.title}")
             else:
                 transcription_sources['exist'].append(source.source_file)
-                self.logger.info(f"Source already exists: {source.title}")
+                self.logger.info(f"Source already exists ({self.data_fetcher.base_url}): {source.title}")
         else:
             raise Exception(f"Invalid source: {source_file}")
         if source.type in ['playlist', 'rss']:

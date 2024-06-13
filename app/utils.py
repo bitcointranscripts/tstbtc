@@ -3,8 +3,6 @@ import os
 import re
 from datetime import datetime, date
 
-import requests
-
 from app.logging import get_logger
 
 logger = get_logger()
@@ -88,7 +86,8 @@ def configure_metadata_given_from_JSON(source, from_json=None):
         metadata["date"] = source.get("date", None)
         metadata["summary"] = source.get("summary", None)
         metadata["episode"] = source.get("episode", None)
-        metadata["additional_resources"] = source.get("additional_resources", None)
+        metadata["additional_resources"] = source.get(
+            "additional_resources", None)
         metadata["cutoff_date"] = source.get("cutoff_date", None)
         metadata["youtube_metadata"] = source.get("youtube", None)
         metadata["media"] = source.get("media", None)
@@ -120,47 +119,3 @@ def configure_metadata_given_from_JSON(source, from_json=None):
         return metadata
     except KeyError as e:
         raise Exception(f"Parsing JSON: {e} is required")
-
-
-def get_status():
-    """Helper method to fetch and store status.json locally"""
-    STATUS_FILE_PATH = "status.json"  # the file path for storing the status locally
-    try:
-        source = STATUS_FILE_PATH
-        if os.path.exists(STATUS_FILE_PATH):
-            # If the file exists locally, load the data from the file
-            with open(STATUS_FILE_PATH, "r") as file:
-                data = json.load(file)
-        else:
-            # If the file doesn't exist locally, fetch it from the remote URL
-            url = "http://btctranscripts.com/status.json"
-            source = url
-            response = requests.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                # Store the fetched data locally
-                with open(STATUS_FILE_PATH, "w") as file:
-                    json.dump(data, file)
-            else:
-                raise Exception(f"Status code: {response.status_code}")
-
-        return data, source
-    except Exception as e:
-        logger.error(f"Error fetching status data: {e}")
-        return None
-
-
-def get_existing_media():
-    """Helper method to create a dictionary with all the existing media from btctranscripts.com
-        It can be used to quickly check if a source is already transcribed"""
-    try:
-        data, source = get_status()  # Fetch status data
-        if data:
-            logger.info(
-                f"Fetched {len(data['existing']['media'])} existing media sources from {source}")
-            return {value: True for value in data["existing"]["media"]}
-        else:
-            return {}
-    except Exception as e:
-        logger.error(f"Error fetching media data: {e}")
-        return {}

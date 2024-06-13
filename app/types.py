@@ -1,11 +1,29 @@
 from typing import (
     Literal,
     TypedDict,
-    Optional
+    Optional,
+    Union
 )
 
 
 GitHubMode = Literal["remote", "local", "none"]
+TranscriptionCoverage = Optional[Literal["full", "none"]]
+
+
+class TranscriptType(TypedDict):
+    title: str
+    media: Optional[Union[str, list[str]]]
+    episode: int
+
+
+class SourceType(TypedDict):
+    title: str
+    source: str
+    categories: Optional[str]
+    loc: str
+    cutoff_date: str
+    transcription_coverage: TranscriptionCoverage
+    transcripts: list[TranscriptType]
 
 
 class Word(TypedDict):
