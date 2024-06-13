@@ -12,7 +12,6 @@ from app import (
 )
 from app.commands import queue
 from app.logging import configure_logger, get_logger
-from app.transcript import Transcript
 from app.transcription import Transcription
 from app.types import GitHubMode
 
@@ -432,6 +431,7 @@ def postprocess(
             chapters=metadata["chapters"],
             link=metadata["media"],
             preprocess=False,
+            nocheck=True,
             cutoff_date=metadata["cutoff_date"]
         )
         # Finalize transcription service output

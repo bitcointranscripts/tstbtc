@@ -1,6 +1,7 @@
 from typing import (
     Literal,
-    TypedDict
+    TypedDict,
+    Optional
 )
 
 
@@ -38,3 +39,27 @@ class SpeakerSegmentWithSentences(TypedDict):
     start: float
     end: float
     sentences: list[Sentence]
+
+# format required by
+# https://github.com/pietrop/slate-transcript-editor
+
+
+class DigitalPaperEditWord(TypedDict):
+    id: int
+    start: float
+    end: float
+    text: str
+
+
+class DigitalPaperEditParagraph(TypedDict):
+    id: int
+    start: float
+    end: float
+    speaker: str
+    # custom addition to the dpe format
+    chapter: Optional[str]
+
+
+class DigitalPaperEditFormat(TypedDict):
+    words: list[DigitalPaperEditWord]
+    paragraphs: list[DigitalPaperEditParagraph]

@@ -17,6 +17,9 @@ from app.media_processor import MediaProcessor
 from app.transcript import Transcript
 from app.types import (
     Sentence,
+    DigitalPaperEditFormat,
+    DigitalPaperEditParagraph,
+    DigitalPaperEditWord,
     SpeakerSegment,
     SpeakerSegmentWithSentences
 )
@@ -30,12 +33,14 @@ class Deepgram:
         self.diarize = diarize
         self.upload = upload
         self.data_writer = data_writer
+        self.one_sentence_per_line = True
         self.dev_mode = False  # Extra capabilities during development mode
         self.max_audio_length = 3600.0  # 60 minutes in seconds
         self.processor = MediaProcessor(chunk_length=1200.0)
 
-    def audio_to_text(self, audio_file):
-        logger.info("Transcribing audio to text using deepgram...")
+    def audio_to_text(self, audio_file, chunk=None):
+        logger.info(
+            f"Transcribing audio {f'(chunk {chunk}) ' if chunk else ''}to text using deepgram...")
         try:
             config = dotenv_values(".env")
             dg_client = deepgram.Deepgram(config["DEEPGRAM_API_KEY"])
@@ -248,9 +253,9 @@ class Deepgram:
         def add_band_aid_word(last_sentence_current, first_sentence_next):
             """
             Creates a "band-aid" word entry to indicate the point of sentence merging in development mode.
-            This method calculates the difference in speaker confidence between the last word of the current sentence 
-            and the first word of the next sentence. The band-aid word is formatted as '[bs={difference}]', where 
-            'difference' is the calculated speaker confidence difference. This helps in visually identifying the 
+            This method calculates the difference in speaker confidence between the last word of the current sentence
+            and the first word of the next sentence. The band-aid word is formatted as '[bs={difference}]', where
+            'difference' is the calculated speaker confidence difference. This helps in visually identifying the
             location and degree of modification when sentences are combined due to the broken sentence heuristic.
             """
             # Calculate the speaker confidence difference
@@ -334,6 +339,85 @@ class Deepgram:
             logger.error(f"(deepgram) Error fixing broken sentences: {e}")
             raise
 
+    def transform_to_digital_paper_edit_format(self, segments: list[SpeakerSegmentWithSentences], chapters: list[list]) -> DigitalPaperEditFormat:
+        words: list[DigitalPaperEditWord] = []
+        paragraphs: list[DigitalPaperEditParagraph] = []
+
+        word_id = 0  # Unique identifier for each word
+        chapter_index = 0 if chapters else None
+        next_chapter_title = None
+        next_chapter_start_time = float('inf')
+
+        if chapter_index is not None and chapter_index < len(chapters):
+            _, next_chapter_start_time, next_chapter_title,  = chapters[chapter_index]
+
+        for segment in segments:
+            segment_start = segment['start']
+            segment_end = segment['end']
+            segment_speaker = f"Speaker {segment['speaker']}"
+            sentences = segment['sentences']
+
+            current_sentence_index = 0
+            paragraph_start = segment_start
+            chapter_title = None
+
+            while current_sentence_index < len(sentences):
+                sentence = sentences[current_sentence_index]
+                sentence_start = sentence['start']
+                sentence_end = sentence['end']
+
+                # Check if a new chapter starts before this sentence
+                if chapter_index is not None and next_chapter_start_time <= sentence_start:
+                    if paragraph_start < next_chapter_start_time:
+                        # Prepare paragraph data
+                        paragraph_data = {
+                            "id": len(paragraphs),
+                            "start": paragraph_start,
+                            "end": next_chapter_start_time,
+                            "speaker": segment_speaker
+                        }
+
+                        if chapter_title is not None:
+                            paragraph_data["chapter"] = chapter_title
+
+                        # Create a paragraph for the portion before the chapter
+                        paragraphs.append(DigitalPaperEditParagraph(**paragraph_data))
+
+                    # Update for the new chapter
+                    paragraph_start = next_chapter_start_time
+                    chapter_title = next_chapter_title
+
+                    # Move to the next chapter
+                    chapter_index += 1
+                    if chapter_index < len(chapters):
+                        _, next_chapter_start_time, next_chapter_title,  = chapters[chapter_index]
+                    else:
+                        next_chapter_title = None
+                        next_chapter_start_time = float('inf')
+
+                for word in sentence['words']:
+                    digital_paper_edit_word = DigitalPaperEditWord(
+                        id=word_id,
+                        start=word['start'],
+                        end=word['end'],
+                        text=word['punctuated_word']
+                    )
+                    words.append(digital_paper_edit_word)
+                    word_id += 1
+
+                current_sentence_index += 1
+
+            # Add remaining part of the segment as a paragraph
+            paragraphs.append(DigitalPaperEditParagraph(
+                id=len(paragraphs),
+                start=paragraph_start,
+                end=segment_end,
+                speaker=segment_speaker,
+                chapter=chapter_title if paragraph_start < next_chapter_start_time else None
+            ))
+
+        return DigitalPaperEditFormat(words=words, paragraphs=paragraphs)
+
     def construct_transcript(self, speaker_segments: list[SpeakerSegmentWithSentences], chapters):
         def add_timestamp(speaker, timestamp):
             return f"Speaker {speaker}: {utils.decimal_to_sexagesimal(timestamp)}\n\n"
@@ -345,7 +429,7 @@ class Deepgram:
             def construct_sentence_with_confidence_annotations(sentence: Sentence):
                 """
                 Constructs a sentence string with embedded speaker confidence annotations.
-                This method constructs a sentence string from individual words, appending the speaker confidence 
+                This method constructs a sentence string from individual words, appending the speaker confidence
                 for each word or group of words with the same confidence. In development mode, this aids in
                 analyzing and debugging the sentence construction process by providing clear visibility of
                 confidence levels and sentence modification points.
@@ -391,17 +475,26 @@ class Deepgram:
                 for i, sentence_data in enumerate(speaker_data["sentences"]):
                     sentence_start = sentence_data["start"]
                     first_sentence = i == 0
+                    last_sentence = i == len(speaker_data["sentences"]) - 1
+                    chapter_splits_segment = False
 
                     if chapter_index is not None and chapter_index < len(chapters):
                         chapter_id, chapter_start_time, chapter_title = chapters[chapter_index]
 
                         if chapter_start_time <= sentence_start:
                             # Chapter starts at this sentence
-                            final_transcript += "\n" if not first_sentence else ""
+                            # Add Chapter title
+                            if not first_sentence:
+                                final_transcript += "\n"
+                                if not self.one_sentence_per_line:
+                                    final_transcript += "\n"
                             final_transcript += f"## {chapter_title}\n\n"
+                            # Add speaker timestamp for the rest of the speaker's
+                            # segment that comes after the chapter title
                             if not single_speaker and not first_sentence:
                                 final_transcript += add_timestamp(
                                     speaker_id, chapter_start_time)
+                                chapter_splits_segment = True
                             chapter_index += 1
 
                     if not single_speaker and first_sentence:
@@ -412,7 +505,11 @@ class Deepgram:
                     if self.dev_mode:
                         final_transcript += f'{construct_sentence(sentence_data)}\n'
                     else:
-                        final_transcript += f'{sentence_data["transcript"]}\n'
+                        if self.one_sentence_per_line:
+                            final_transcript += f'{sentence_data["transcript"]}\n'
+                        else:
+                            final_transcript += f'{" " if not first_sentence and not chapter_splits_segment else ""}{sentence_data["transcript"]}'
+                            final_transcript += "\n" if last_sentence else ""
 
                 final_transcript += "\n"
 
@@ -440,6 +537,10 @@ class Deepgram:
                 speaker_segements_with_sentences)
             adjusted_chapters = self.adjust_chapter_timestamps(
                 speaker_segements_with_sentences, transcript.source.chapters)
+            dpe_format = self.transform_to_digital_paper_edit_format(
+                speaker_segements_with_sentences, adjusted_chapters)
+            self.data_writer.write_json(
+                data=dpe_format, file_path=transcript.output_path_with_title, filename="dpe", include_timestamp=False)
             result = self.construct_transcript(
                 speaker_segements_with_sentences, adjusted_chapters)
 
@@ -533,18 +634,15 @@ class Deepgram:
         return combined_output
 
     def transcribe_in_chunks(self, transcript: Transcript):
-        logger.info(
-            f"Audio file is longer than {self.max_audio_length / 60} minutes. Splitting into chunks.")
-
         # Split audio into chunks
         overlap_between_chunks = 30.0
         chunk_files = self.processor.split_audio(
             transcript.audio_file, overlap=overlap_between_chunks)
-
+        # TODO print information about the chunking
         all_chunks_output = []
         deepgram_chunks = []
         for i, chunk_file in enumerate(chunk_files):
-            chunk_output = self.audio_to_text(chunk_file)
+            chunk_output = self.audio_to_text(chunk_file, i+1)
             all_chunks_output.append(chunk_output)
 
             # Write intermediate deepgram output to JSON file
@@ -574,7 +672,10 @@ class Deepgram:
             transcription_service_output = {}
 
             if audio_duration > self.max_audio_length:
-                transcription_service_output = self.transcribe_in_chunks(transcript)
+                logger.info(
+                    f"Audio file is longer than {self.max_audio_length / 60} minutes. Splitting into {self.processor.chunk_length / 60} min chunks.")
+                transcription_service_output = self.transcribe_in_chunks(
+                    transcript)
             else:
                 transcription_service_output = self.audio_to_text(
                     transcript.audio_file)

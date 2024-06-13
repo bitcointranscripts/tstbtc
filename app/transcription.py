@@ -161,7 +161,7 @@ class Transcription:
                 # Invalid URL or video not found
                 raise Exception(f"Invalid source: {e}")
         try:
-            if source.source_file.endswith((".mp3", ".wav", ".m4a")):
+            if source.source_file.endswith((".mp3", ".wav", ".m4a", ".aac")):
                 return Audio(source=source, chapters=chapters)
             if source.source_file.endswith(("rss", ".xml")):
                 return RSS(source=source)
@@ -213,7 +213,7 @@ class Transcription:
         preprocess=True,
         youtube_metadata=None,
         link=None,
-        chapters=None,
+        chapters=[],
         nocheck=False,
         excluded_media=[]
     ):
@@ -360,10 +360,20 @@ class Transcription:
                 os.makedirs(destination_path, exist_ok=True)
                 # Ensure the markdown file exists before copying
                 if os.path.exists(markdown_file):
-                    shutil.copy(markdown_file, destination_path)
                     markdown_file_name = os.path.basename(markdown_file)
-                    subprocess.run(['git', 'add', os.path.join(
-                        destination_path, markdown_file_name)])
+                    file_base, file_extension = os.path.splitext(
+                        markdown_file_name)
+                    destination_file_path = os.path.join(
+                        destination_path, markdown_file_name)
+                    # In case the source has another
+                    # transcript with the same name
+                    if os.path.exists(destination_file_path):
+                        new_file_name = f"{file_base}-2{file_extension}"
+                        destination_file_path = os.path.join(
+                            destination_path, new_file_name)
+
+                    shutil.copy(markdown_file, destination_file_path)
+                    subprocess.run(['git', 'add', destination_file_path])
                     subprocess.run(
                         ['git', 'commit', '-m', f'Add "{output["transcript"].title}" to {output["transcript"].source.loc}'])
                 else:

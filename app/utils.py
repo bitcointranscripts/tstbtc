@@ -11,6 +11,7 @@ logger = get_logger()
 
 
 def slugify(text):
+    text = text.replace('_', '-')
     return re.sub(r'\W+', '-', text).strip('-').lower()
 
 
@@ -104,6 +105,17 @@ def configure_metadata_given_from_JSON(source, from_json=None):
                 base_directory = os.path.dirname(from_json)
                 metadata[key] = os.path.join(base_directory, metadata[key])
                 check_if_valid_file_path(metadata[key])
+
+        # Handle deepgram_chunks
+        metadata["deepgram_chunks"] = source.get("deepgram_chunks", [])
+        if metadata["deepgram_chunks"] and from_json:
+            base_directory = os.path.dirname(from_json)
+            metadata["deepgram_chunks"] = [
+                os.path.join(base_directory, chunk)
+                for chunk in metadata["deepgram_chunks"]
+            ]
+            for chunk_file in metadata["deepgram_chunks"]:
+                check_if_valid_file_path(chunk_file)
 
         return metadata
     except KeyError as e:
