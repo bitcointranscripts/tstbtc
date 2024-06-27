@@ -1,0 +1,12 @@
+[DEFAULT]
+deepgram = True
+diarize = True
+summarize = False
+github = none
+save_to_markdown = True
+noqueue = True
+needs_review = False
+one_sentence_per_line = True
+
+[development]
+verbose_logging = True

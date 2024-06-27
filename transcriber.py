@@ -8,9 +8,10 @@ import click
 from app import (
     __app_name__,
     __version__,
+    commands,
     utils
 )
-from app.commands import queue
+from app.config import config
 from app.logging import configure_logger, get_logger
 from app.transcription import Transcription
 from app.types import GitHubMode
@@ -23,7 +24,6 @@ def print_version(ctx, param, value):
         return
     click.echo(f"{__app_name__} v{__version__}")
     ctx.exit()
-
 
 @click.option(
     "-v",
@@ -38,13 +38,11 @@ def print_version(ctx, param, value):
 def cli():
     pass
 
-
 def print_help(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
     logging.info(ctx.get_help())
     ctx.exit()
-
 
 whisper = click.option(
     "-m",
@@ -62,7 +60,7 @@ whisper = click.option(
             "large-v2",
         ]
     ),
-    default="tiny.en",
+    default=config.get('model', 'tiny.en'),
     show_default=True,
     help="Select which whisper model to use for the transcription",
 )
@@ -70,14 +68,14 @@ deepgram = click.option(
     "-D",
     "--deepgram",
     is_flag=True,
-    default=False,
+    default=config.getboolean('deepgram', False),
     help="Use deepgram for transcription",
 )
 diarize = click.option(
     "-M",
     "--diarize",
     is_flag=True,
-    default=False,
+    default=config.getboolean('diarize', False),
     help="Supply this flag if you have multiple speakers AKA "
     "want to diarize the content",
 )
@@ -85,12 +83,13 @@ summarize = click.option(
     "-S",
     "--summarize",
     is_flag=True,
-    default=False,
+    default=config.getboolean('summarize', False),
     help="Summarize the transcript [only available with deepgram]",
 )
 cutoff_date = click.option(
     "--cutoff-date",
     type=str,
+    default=config.get('cutoff_date', None),
     help=("Specify a cutoff date (in YYYY-MM-DD format) to process only sources "
           "published after this date. Sources with a publication date on or before "
           "the cutoff will be excluded from processing. This option is useful for "
@@ -100,7 +99,7 @@ cutoff_date = click.option(
 github = click.option(
     "--github",
     type=click.Choice(["remote", "local", "none"]),
-    default="none",
+    default=config.get('github', 'none'),
     help=("Specify the GitHub operation mode."
           "'remote': Create a new branch, push changes to it, and push it to the origin bitcointranscripts repo. "
           "'local': Commit changes to the current local branch without pushing to the remote repo."
@@ -111,46 +110,46 @@ upload_to_s3 = click.option(
     "-u",
     "--upload",
     is_flag=True,
-    default=False,
+    default=config.getboolean('upload_to_s3', False),
     help="Upload processed model files to AWS S3",
 )
 save_to_markdown = click.option(
     "--markdown",
     is_flag=True,
-    default=False,
+    default=config.getboolean('save_to_markdown', False),
     help="Save the resulting transcript to a markdown format supported by bitcointranscripts",
 )
 noqueue = click.option(
     "--noqueue",
     is_flag=True,
-    default=False,
+    default=config.getboolean('noqueue', False),
     help="Do not push the resulting transcript to the Queuer backend",
 )
 needs_review = click.option(
     "--needs-review",
     is_flag=True,
-    default=False,
+    default=config.getboolean('needs_review', False),
     help="Add 'needs review' flag to the resulting transcript",
 )
 model_output_dir = click.option(
     "-o",
     "--model_output_dir",
     type=str,
-    default="local_models/",
+    default=config.get('model_output_dir', 'local_models/'),
     show_default=True,
     help="Set the directory for saving model outputs",
 )
 nocleanup = click.option(
     "--nocleanup",
     is_flag=True,
-    default=False,
+    default=config.getboolean('nocleanup', False),
     help="Do not remove temp files on exit",
 )
 verbose_logging = click.option(
     "-V",
     "--verbose",
     is_flag=True,
-    default=False,
+    default=config.getboolean('verbose_logging', False),
     help="Supply this flag to enable verbose logging",
 )
 
@@ -189,7 +188,6 @@ add_category = click.option(
     multiple=True,
     help="Add a category to the transcript's metadata (can be used multiple times)",
 )
-
 
 @cli.command()
 @click.argument("source", nargs=1)
@@ -462,8 +460,7 @@ def postprocess(
         logger.error(e)
         traceback.print_exc()
 
-
-cli.add_command(queue.commands)
+cli.add_command(commands.queue)
 
 if __name__ == '__main__':
     cli()

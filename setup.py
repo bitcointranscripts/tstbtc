@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 
-with open("Readme.md", "r", encoding="utf-8") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = fh.read()
@@ -15,7 +15,7 @@ setup(
     description="transcribes youtube videos/media to bitcointranscript",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/tvpeter/yt2btc",
+    url="https://github.com/bitcointranscripts/tstbtc",
     py_modules=["transcriber"],
     packages=find_packages(),
     install_requires=[requirements],

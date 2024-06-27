@@ -60,6 +60,23 @@ This transcription tool operates through a structured four-stage process:
     - for other users, follow the instruction on
       their [site](https://ffmpeg.org/) to install
 
+- To use a specific [configuration profile](#configuration), set the `PROFILE` variable in your `.env` file.
+
+
+## Configuration
+
+This application supports configuration via a `config.ini` file.
+This file allows you to set default values for various options and flags, reducing the need to specify them on the command line every time.
+Additionally, the configuration file can include options not available through the command line, offering greater flexibility and control over the application's behavior.
+
+### Creating a Configuration File
+
+An example configuration file named `config.ini.example` is included in the repository.
+To use it, copy it to `config.ini` and modify it according to your needs:
+```sh
+cp config.ini.example config.ini
+```
+
 ## Install/Uninstall
 
 Navigate to the application directory and run the below commands:
@@ -68,9 +85,8 @@ Navigate to the application directory and run the below commands:
 
 `source venv/bin/activate` activates the virtual environment
 
-`pip3 install . --use-pep517` to install the application
+`pip3 install .` to install the application
 
-To check the version:
 `tstbtc --version` view the application version
 
 `tstbtc --help` view the application help
