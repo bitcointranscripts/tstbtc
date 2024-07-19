@@ -100,6 +100,12 @@ cutoff_date = click.option(
           "focusing on newer content or limiting the scope of processing to a "
           "specific date range.")
 )
+username = click.option(
+    "--username",
+    type=str,
+    default=settings.config.get('username', None),
+    help=("Specify a username for transcription attribution.")
+)
 github = click.option(
     "--github",
     type=click.Choice(["remote", "local", "none"]),
@@ -211,6 +217,7 @@ add_category = click.option(
 # Options for configuring the transcription preprocess
 @cutoff_date
 # Options for configuring the transcription postprocess
+@username
 @github
 @upload_to_s3
 @save_to_markdown
@@ -229,6 +236,7 @@ def transcribe(
     tags: list,
     speakers: list,
     category: list,
+    username: str,
     github: GitHubMode,
     deepgram: bool,
     summarize: bool,
@@ -264,6 +272,7 @@ def transcribe(
         "tags": list(tags),
         "speakers": list(speakers),
         "category": list(category),
+        "username": username,
         "github": github,
         "deepgram": deepgram,
         "summarize": summarize,
