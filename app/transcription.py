@@ -89,7 +89,7 @@ class Transcription:
         config = dotenv_values(".env")
         metadata_dir = config.get("TSTBTC_METADATA_DIR")
         if not metadata_dir:
-            alternative_metadata_dir = "/metadata"
+            alternative_metadata_dir = "metadata/"
             self.logger.warning(
                 f"'TSTBTC_METADATA_DIR' environment variable is not defined. Metadata will be stored at '{alternative_metadata_dir}'.")
             return alternative_metadata_dir
