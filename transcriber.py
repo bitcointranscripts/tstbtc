@@ -4,12 +4,7 @@ import traceback
 
 import click
 
-from app import (
-    __app_name__,
-    __version__,
-    commands,
-    utils
-)
+from app import __app_name__, __version__, commands, utils
 from app.api_client import APIClient
 from app.commands.cli_utils import ServerCheckGroup, get_transcription_url
 from app.config import settings
@@ -19,11 +14,13 @@ from app.transcription import Transcription
 
 logger = get_logger()
 
+
 def print_version(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
     click.echo(f"{__app_name__} v{__version__}")
     ctx.exit()
+
 
 @click.option(
     "-v",
@@ -38,11 +35,13 @@ def print_version(ctx, param, value):
 def cli():
     pass
 
+
 def print_help(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
     logging.info(ctx.get_help())
     ctx.exit()
+
 
 whisper = click.option(
     "-m",
@@ -60,7 +59,7 @@ whisper = click.option(
             "large-v2",
         ]
     ),
-    default=settings.config.get('model', 'tiny.en'),
+    default=settings.config.get("model", "tiny.en"),
     show_default=True,
     help="Select which whisper model to use for the transcription",
 )
@@ -68,7 +67,7 @@ deepgram = click.option(
     "-D",
     "--deepgram",
     is_flag=True,
-    default=settings.config.getboolean('deepgram', False),
+    default=settings.config.getboolean("deepgram", False),
     show_default=True,
     help="Use deepgram for transcription",
 )
@@ -76,7 +75,7 @@ diarize = click.option(
     "-M",
     "--diarize",
     is_flag=True,
-    default=settings.config.getboolean('diarize', False),
+    default=settings.config.getboolean("diarize", False),
     show_default=True,
     help="Supply this flag if you have multiple speakers AKA "
     "want to diarize the content",
@@ -85,77 +84,91 @@ summarize = click.option(
     "-S",
     "--summarize",
     is_flag=True,
-    default=settings.config.getboolean('summarize', False),
+    default=settings.config.getboolean("summarize", False),
     show_default=True,
     help="Summarize the transcript [only available with deepgram]",
 )
 cutoff_date = click.option(
     "--cutoff-date",
     type=str,
-    default=settings.config.get('cutoff_date', None),
-    help=("Specify a cutoff date (in YYYY-MM-DD format) to process only sources "
-          "published after this date. Sources with a publication date on or before "
-          "the cutoff will be excluded from processing. This option is useful for "
-          "focusing on newer content or limiting the scope of processing to a "
-          "specific date range.")
+    default=settings.config.get("cutoff_date", None),
+    help=(
+        "Specify a cutoff date (in YYYY-MM-DD format) to process only sources "
+        "published after this date. Sources with a publication date on or before "
+        "the cutoff will be excluded from processing. This option is useful for "
+        "focusing on newer content or limiting the scope of processing to a "
+        "specific date range."
+    ),
 )
 username = click.option(
     "--username",
     type=str,
-    default=settings.config.get('username', None),
-    help=("Specify a username for transcription attribution.")
+    default=settings.config.get("username", None),
+    help=("Specify a username for transcription attribution."),
 )
 github = click.option(
     "--github",
     is_flag=True,
-    default=settings.config.getboolean('github', False),
+    default=settings.config.getboolean("github", False),
     help="Push the resulting transcript(s) to GitHub",
-    show_default=True
+    show_default=True,
 )
 upload_to_s3 = click.option(
     "-u",
     "--upload",
     is_flag=True,
-    default=settings.config.getboolean('upload_to_s3', False),
+    default=settings.config.getboolean("upload_to_s3", False),
     help="Upload processed model files to AWS S3",
 )
 save_to_markdown = click.option(
     "--markdown",
     is_flag=True,
-    default=settings.config.getboolean('save_to_markdown', False),
-    help="Save the resulting transcript to a markdown format supported by bitcointranscripts",
+    default=settings.config.getboolean("save_to_markdown", False),
+    help="Save the resulting transcript to a markdown format",
+)
+save_to_text = click.option(
+    "--text",
+    is_flag=True,
+    default=settings.config.getboolean("save_to_text", False),
+    help="Save the resulting transcript to a plain text file",
+)
+markdown_no_metadata = click.option(
+    "--no-metadata",
+    is_flag=True,
+    default=settings.config.getboolean("no_metadata", False),
+    help="Don't include metadata in the markdown output",
 )
 noqueue = click.option(
     "--noqueue",
     is_flag=True,
-    default=settings.config.getboolean('noqueue', False),
+    default=settings.config.getboolean("noqueue", False),
     help="Do not push the resulting transcript to the Queuer backend",
 )
 needs_review = click.option(
     "--needs-review",
     is_flag=True,
-    default=settings.config.getboolean('needs_review', False),
+    default=settings.config.getboolean("needs_review", False),
     help="Add 'needs review' flag to the resulting transcript",
 )
 model_output_dir = click.option(
     "-o",
     "--model_output_dir",
     type=str,
-    default=settings.config.get('model_output_dir', 'local_models/'),
+    default=settings.config.get("model_output_dir", "local_models/"),
     show_default=True,
     help="Set the directory for saving model outputs",
 )
 nocleanup = click.option(
     "--nocleanup",
     is_flag=True,
-    default=settings.config.getboolean('nocleanup', False),
+    default=settings.config.getboolean("nocleanup", False),
     help="Do not remove temp files on exit",
 )
 verbose_logging = click.option(
     "-V",
     "--verbose",
     is_flag=True,
-    default=settings.config.getboolean('verbose_logging', False),
+    default=settings.config.getboolean("verbose_logging", False),
     help="Supply this flag to enable verbose logging",
 )
 
@@ -195,6 +208,7 @@ add_category = click.option(
     help="Add a category to the transcript's metadata (can be used multiple times)",
 )
 
+
 @cli.command()
 @click.argument("source", nargs=1)
 # Available transcription models and services
@@ -217,6 +231,8 @@ add_category = click.option(
 @github
 @upload_to_s3
 @save_to_markdown
+@save_to_text
+@markdown_no_metadata
 @noqueue
 @needs_review
 # Configuration options
@@ -243,6 +259,8 @@ def transcribe(
     nocleanup: bool,
     noqueue: bool,
     markdown: bool,
+    text: bool,
+    no_metadata: bool,
     needs_review: bool,
     cutoff_date: str,
 ) -> None:
@@ -279,6 +297,8 @@ def transcribe(
         "nocleanup": nocleanup,
         "noqueue": noqueue,
         "markdown": markdown,
+        "text": text,
+        "include_metadata": not no_metadata,
         "needs_review": needs_review,
         "cutoff_date": cutoff_date,
     }
@@ -290,6 +310,7 @@ def transcribe(
         logger.info(start_response)
     except Exception as e:
         logger.error(f"Transcription operation failed: {e}")
+
 
 @cli.command()
 def get_queue():
@@ -303,6 +324,7 @@ def get_queue():
         logger.info(response)
     except Exception as e:
         logger.error(f"Failed to get queue: {e}")
+
 
 @cli.command()
 @click.argument("source", nargs=1)
@@ -330,7 +352,7 @@ def preprocess(
     speakers: list,
     category: list,
     nocheck: bool,
-    cutoff_date: str
+    cutoff_date: str,
 ):
     """Preprocess the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -358,10 +380,15 @@ def preprocess(
     try:
         response_data = api_client.preprocess_source(data, source)
         data_writer = DataWriter("local_models/")
-        file_path = data_writer.write_json(data=response_data.json()["data"], file_path="", filename="preprocessed_sources")
+        file_path = data_writer.write_json(
+            data=response_data.json()["data"],
+            file_path="",
+            filename="preprocessed_sources",
+        )
         logger.info(f"Data successfully written to {file_path}")
     except Exception as e:
         logger.error(f"Preprocessing operation failed: {e}")
+
 
 @cli.command()
 @click.argument(
@@ -380,6 +407,7 @@ def preprocess(
 @github
 @upload_to_s3
 @save_to_markdown
+@save_to_text
 @noqueue
 @needs_review
 def postprocess(
@@ -389,6 +417,7 @@ def postprocess(
     github: bool,
     upload: bool,
     markdown: bool,
+    text: bool,
     noqueue: bool,
     needs_review: bool,
 ):
@@ -405,6 +434,7 @@ def postprocess(
             upload=upload,
             username=username,
             markdown=markdown,
+            text_output=text,
             queue=not noqueue,
             needs_review=needs_review,
         )
@@ -460,5 +490,5 @@ def postprocess(
 cli.add_command(commands.queue)
 cli.add_command(commands.curator)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

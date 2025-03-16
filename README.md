@@ -179,6 +179,7 @@ To push the resulting transcript(s) to GitHub:
 3. Use the `--github` flag when running the script to automatically create a branch in the target repositories and submit pull requests with the new transcripts and associated metadata.
 
 To convert your GitHub App private key file to base64, use the following command:
+
 ```
 base64 -w 0 path/to/your/private-key.pem
 ```
@@ -204,17 +205,21 @@ For detailed instructions on using Docker with this project, including how to wo
 
 ## Testing
 
-To run the unit tests
+The transcription tool includes a comprehensive test suite built using pytest.
 
-`pytest -v -m main -s`
+```sh
+# Run all tests
+pytest
 
-To run the feature tests
+# Run specific test categories
+pytest -m unit       # Run only unit tests
+pytest -m exporters  # Run only exporter-related tests
 
-`pytest -v -m feature -s`
+# Run with coverage report
+pytest --cov=app
+```
 
-To run the full test suite
-
-`pytest -v -s`
+For detailed documentation on the testing infrastructure, test organization, and how to add new tests, please see the [tests directory README](tests/README.md).
 
 ## License
 

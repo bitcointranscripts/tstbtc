@@ -105,6 +105,8 @@ async def add_to_queue(
     nocleanup: bool = Form(False),
     noqueue: bool = Form(True),
     markdown: bool = Form(False),
+    text: bool = Form(False),
+    no_metadata: bool = Form(False),
     needs_review: bool = Form(False),
     nocheck: bool = Form(False),
     cutoff_date: Optional[str] = Form(None),
@@ -125,6 +127,8 @@ async def add_to_queue(
             nocleanup=nocleanup,
             queue=not noqueue,
             markdown=markdown,
+            include_metadata=not no_metadata,
+            text_output=text,
             needs_review=needs_review,
         )
         if source_file:

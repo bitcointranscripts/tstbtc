@@ -1,7 +1,6 @@
 import os
 import tempfile
 
-import yaml
 import yt_dlp
 
 from app.config import settings
@@ -15,6 +14,7 @@ from app.queuer import Queuer
 from app.data_writer import DataWriter
 from app.data_fetcher import DataFetcher
 from app.github_api_handler import GitHubAPIHandler
+from app.exporters import ExporterFactory, TranscriptExporter
 
 
 class Transcription:
@@ -30,11 +30,13 @@ class Transcription:
         nocleanup=False,
         queue=True,
         markdown=False,
+        text_output=False,
         username=None,
         test_mode=False,
         working_dir=None,
         batch_preprocessing_output=False,
         needs_review=False,
+        include_metadata=True,
     ):
         self.nocleanup = nocleanup
         self.status = "idle"  # Can be "idle", "in_progress", or "completed"
@@ -47,21 +49,42 @@ class Transcription:
         self.transcript_by = self.__configure_username(username)
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
+        self.text_output = text_output
+        self.include_metadata = include_metadata
+
         self.metadata_writer = DataWriter(
             self.__configure_tstbtc_metadata_dir()
         )
+
+        # Create exporters for transcript output formats
+        export_config = {
+            "markdown": self.markdown,
+            "text_output": self.text_output,
+            "noqueue": not queue,
+            "model_output_dir": model_output_dir,
+        }
+        self.exporters: dict[
+            str, TranscriptExporter
+        ] = ExporterFactory.create_exporters(
+            config=export_config, transcript_by=self.transcript_by
+        )
+
+        self.model_output_dir = model_output_dir
         self.github = github
         self.github_handler = None
         if self.github:
             self.github_handler = GitHubAPIHandler()
         self.review_flag = self.__configure_review_flag(needs_review)
+
+        # @TODO: use ExporterFactory instead of `metadata_writer` for
+        #        services metadata output
         if deepgram:
             self.service = services.Deepgram(
                 summarize, diarize, upload, self.metadata_writer
             )
         else:
             self.service = services.Whisper(model, upload, self.metadata_writer)
-        self.model_output_dir = model_output_dir
+
         self.transcripts: list[Transcript] = []
         # during testing we do not have/need a queuer backend
         self.queuer = Queuer(test_mode=test_mode) if queue is True else None
@@ -429,97 +452,100 @@ class Transcription:
         else:
             self.logger.error("transcripts: Failed to create pull request.")
 
-    def write_to_markdown_file(self, transcript: Transcript, output_dir):
-        """Writes transcript to a markdown file and returns its absolute path
-        This file is the one submitted as part of the Pull Request to the
-        bitcointranscripts repo
+    def write_to_markdown_file(self, transcript: Transcript):
         """
+        Legacy method that uses the markdown exporter to write a markdown file.
+        This maintains compatibility with existing code while using the new architecture.
+        """
+        self.logger.debug(
+            "Creating markdown file with transcription (using exporter)..."
+        )
 
-        class IndentedListDumper(yaml.Dumper):
-            """
-            Custom YAML Dumper that ensures lists are always indented.
-            This is necessary because the default YAML dumper does not indent lists
-            when they are nested inside a mapping/dictionary.
-            """
-
-            def increase_indent(self, flow=False, indentless=False):
-                return super(IndentedListDumper, self).increase_indent(
-                    flow, False
-                )
-
-        self.logger.debug("Creating markdown file with transcription...")
         try:
-            if transcript.outputs["raw"] is None:
-                raise Exception("No transcript found")
+            if "markdown" not in self.exporters:
+                raise Exception("Markdown exporter not configured")
 
-            # Get the metadata from the source
-            metadata = transcript.source.to_json()
+            markdown_exporter = self.exporters["markdown"]
+            export_kwargs = {
+                "version": __version__,
+                "review_flag": self.review_flag,
+                "add_timestamp": False,
+                "include_metadata": self.include_metadata,
+            }
 
-            # Add or modify specific fields
-            metadata[
-                "transcript_by"
-            ] = f"{self.transcript_by} via tstbtc v{__version__}{self.review_flag}"
-
-            # List of fields to exclude from the markdown metadata
-            excluded_fields = ["type", "loc", "chapters", "description"]
-
-            # Remove excluded fields from the metadata
-            for field in excluded_fields:
-                metadata.pop(field, None)
-
-            # Convert metadata to YAML
-            yaml_metadata = yaml.dump(
-                metadata, Dumper=IndentedListDumper, sort_keys=False
+            markdown_file = markdown_exporter.export(
+                transcript, **export_kwargs
             )
-
-            # Prepare the full content
-            full_content = (
-                f"---\n{yaml_metadata}---\n\n{transcript.outputs['raw']}\n"
-            )
-
-            # Write to file
-            markdown_file = f"{utils.configure_output_file_path(output_dir, transcript.title, add_timestamp=False)}.md"
-            with open(markdown_file, "w") as opf:
-                opf.write(full_content)
-
             self.logger.info(f"Markdown file stored at: {markdown_file}")
-            return os.path.abspath(markdown_file)
+            return markdown_file
+
         except Exception as e:
-            raise Exception(f"Error writing to file: {e}")
+            raise Exception(f"Error writing to markdown file: {e}")
 
     def write_to_json_file(self, transcript: Transcript):
-        self.logger.debug("Creating JSON file with transcription...")
-        output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
-        transcript_json = transcript.to_json()
-        transcript_json[
-            "transcript_by"
-        ] = f"{self.transcript_by} via tstbtc v{__version__}"
-        json_file = utils.write_to_json(
-            transcript_json, output_dir, f"{transcript.title}_payload"
+        """
+        Legacy method that uses the JSON exporter to write a JSON file.
+        This maintains compatibility with existing code while using the new architecture.
+        """
+        self.logger.debug(
+            "Creating JSON file with transcription (using exporter)..."
         )
-        self.logger.info(f"Transcription stored at {json_file}")
-        return json_file
+
+        try:
+            if "json" not in self.exporters:
+                raise Exception("JSON exporter not configured")
+
+            json_exporter = self.exporters["json"]
+            export_kwargs = {"version": __version__, "add_timestamp": True}
+
+            json_file = json_exporter.export(transcript, **export_kwargs)
+            self.logger.info(f"JSON file stored at: {json_file}")
+            return json_file
+
+        except Exception as e:
+            raise Exception(f"Error writing to JSON file: {e}")
 
     def postprocess(self, transcript: Transcript) -> None:
+        """
+        Process the transcript to produce output files in the configured formats.
+        This updated method uses exporters when available, but maintains compatibility
+        with the existing code.
+        """
         try:
-            output_dir = f"{self.model_output_dir}/{transcript.source.loc}"
+            # Handle markdown output
             if self.markdown or self.github_handler:
                 transcript.outputs["markdown"] = self.write_to_markdown_file(
                     transcript,
-                    output_dir if not self.test_mode else transcript.tmp_dir,
                 )
-            elif not self.test_mode:
+
+            # Handle text output with exporter
+            if self.text_output and "text" in self.exporters:
+                try:
+                    transcript.outputs["text"] = self.exporters["text"].export(
+                        transcript, add_timestamp=False
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Text exporter failed: {e}")
+
+            # Handle JSON output (for non-queued transcripts)
+            if (
+                not self.test_mode
+                and not self.markdown
+                and not self.github_handler
+            ):
                 transcript_json = transcript.to_json()
                 transcript_json[
                     "transcript_by"
                 ] = f"{self.transcript_by} via tstbtc v{__version__}"
+
                 if self.queuer:
-                    return self.queuer.push_to_queue(transcript_json)
+                    self.queuer.push_to_queue(transcript_json)
                 else:
                     # store payload for the user to manually send it to the queuer
                     transcript.outputs["json"] = self.write_to_json_file(
                         transcript
                     )
+
         except Exception as e:
             raise Exception(f"Error with postprocessing: {e}") from e
 
