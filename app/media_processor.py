@@ -131,7 +131,7 @@ class MediaProcessor:
                     if self.check_url(video_url):
                         return video_url
                 else:
-                    logger.error(f'Error fetching video info from {instance}: {response.status_code}')
+                    logger.error(f'Error fetching video info from {instance}: {response.text} ({response.status_code})')
             except Exception as e:
                 logger.error(f"Error fetching video URL from {instance}: {e}")
         

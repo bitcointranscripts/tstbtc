@@ -520,6 +520,8 @@ def postprocess(
         logger.error(e)
         traceback.print_exc()
 
+
+cli.add_command(commands.media)
 cli.add_command(commands.curator)
 cli.add_command(commands.server)
 
