@@ -19,6 +19,7 @@ def rel_path(path):
 
 
 @pytest.mark.feature
+@pytest.mark.skip(reason="not self-contained, probably will be removed")
 def test_download_audio_file():
     transcription = Transcription(
         test_mode=True,
@@ -32,6 +33,7 @@ def test_download_audio_file():
 
 
 @pytest.mark.feature
+@pytest.mark.skip(reason="not self-contained, probably will be removed")
 def test_download_video_file():
     transcription = Transcription(
         test_mode=True,

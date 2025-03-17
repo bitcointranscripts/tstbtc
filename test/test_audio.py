@@ -21,14 +21,13 @@ def test_audio_with_title():
     title = "title"
     username = "username"
     transcription = Transcription(
-        username=username,
         test_mode=True,
     )
     transcription.add_transcription_source(source_file=source, title=title)
     transcripts = transcription.start()
-    assert os.path.isfile(transcripts[0]["markdown"])
+    assert os.path.isfile(transcripts[0].outputs["markdown"])
     check_md_file(
-        path=transcripts[0]["markdown"],
+        path=transcripts[0].outputs["markdown"],
         transcript_by=username,
         media=source,
         title=title,
@@ -47,25 +46,24 @@ def test_audio_with_all_data():
     title = "title"
     speakers = ["speaker1", "speaker2"]
     tags = ["tag1", "tag2"]
-    category = "category"
+    category = ["category"]
     date = "2020-01-31"
     transcription = Transcription(
-        username=username,
         test_mode=True,
     )
     transcription.add_transcription_source(
         source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start()
 
-    assert os.path.isfile(transcripts[0]["markdown"])
+    assert os.path.isfile(transcripts[0].outputs["markdown"])
     check_md_file(
-        path=transcripts[0]["markdown"],
+        path=transcripts[0].outputs["markdown"],
         transcript_by=username,
         media=source,
         title=title,
         date=date,
         tags=tags,
-        category=category,
+        categories=category,
         speakers=speakers,
         local=True,
     )

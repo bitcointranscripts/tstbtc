@@ -22,12 +22,12 @@ jobs:
       - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: "3.9"
+          python-version: "3.11"
       - uses: FedericoCarboni/setup-ffmpeg@v2
         id: setup-ffmpeg
       - name: Install dependencies
         run: |
-          pip3 install --use-pep517 --editable .
+          pip3 install .
       - name: Test the application
         run: |
           pytest -v -s .

@@ -6,9 +6,9 @@ from typing import Literal
 
 class DataWriter:
     """
-    The DataWriter class is responsible for managing all file writing operations within the application. 
+    The DataWriter class is responsible for managing all file writing operations within the application.
     It provides a centralized mechanism to write data files, into a structured directory hierarchy.
-    This class ensures that all data writes are handled uniformly, supporting maintainability 
+    This class ensures that all data writes are handled uniformly, supporting maintainability
     and scalability of file management operations.
     """
 
@@ -31,12 +31,22 @@ class DataWriter:
         structured directory path based on `file_path` and `filename`
         """
         output_file = self.construct_file_path(
-            file_path, filename, type='json', include_timestamp=include_timestamp)
-        with open(output_file, 'w') as json_file:
+            file_path,
+            filename,
+            type="json",
+            include_timestamp=include_timestamp,
+        )
+        with open(output_file, "w") as json_file:
             json.dump(data, json_file, indent=4)
         return output_file
 
-    def construct_file_path(self, file_path, filename, type: Literal['json', 'srt'], include_timestamp=True):
+    def construct_file_path(
+        self,
+        file_path,
+        filename,
+        type: Literal["json", "srt"],
+        include_timestamp=True,
+    ):
         """
         Constructs the full file path for the data file, creating necessary
         directories and appending a timestamp and file type to the filename

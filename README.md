@@ -1,6 +1,6 @@
 # TRANSCRIBER TO BITCOIN TRANSCRIPT
 
-This cli app transcribes audio and video for submission to the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo. 
+This cli app transcribes audio and video for submission to the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo.
 
 **Available transcription models and services**
 
@@ -16,52 +16,44 @@ This transcription tool operates through a structured four-stage process:
 1. Preprocess: Gathers all the available metadata for each source (supports YouTube videos&playlists, and RSS feeds)
 2. Process: Downloads and converts sources for transcription preparation
 3. Transcription: Utilizes [`openai-whisper`](https://github.com/openai/whisper) or [Deepgram](https://deepgram.com/) to generate transcripts.
-    1. Converts audio to text.
-        - Save as JSON: Preserves the output of the transcription service for future use.
-        - Save as SRT: Generates SRT file [whisper only]
-    2. Summarize: Generates a summary of the transcript. [deepgram only]
-    3. Upload: Saves transcription service output in an AWS S3 Bucket [optional]
-    4. Finalizes the resulting transcript.
-        - Process diarization. [deepgram only]
-        - Process chapters.
+   1. Converts audio to text.
+      - Save as JSON: Preserves the output of the transcription service for future use.
+      - Save as SRT: Generates SRT file [whisper only]
+   2. Summarize: Generates a summary of the transcript. [deepgram only]
+   3. Upload: Saves transcription service output in an AWS S3 Bucket [optional]
+   4. Finalizes the resulting transcript.
+      - Process diarization. [deepgram only]
+      - Process chapters.
 4. Postprocess: Offers multiple options for further actions:
-    - **Push to GitHub**: Push transcripts to your fork of the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo.
-    - **Markdown**: Saves transcripts in a markdown format supported by bitcointranscripts.
-    - **Upload**: Saves transcripts in an AWS S3 Bucket.
-    - **Push to Queuer backend**: Sends transcripts to [a Queuer backend](https://github.com/bitcointranscripts/transcription-review-backend).
-    - **Save as JSON**: Preserves transcripts for future use.
-
+   - **Push to GitHub**: Push transcripts to your fork of the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo.
+   - **Markdown**: Saves transcripts in a markdown format supported by bitcointranscripts.
+   - **Upload**: Saves transcripts in an AWS S3 Bucket.
+   - **Save as JSON**: Preserves transcripts for future use.
 
 ## Prerequisites
+
+- This tool requires a running server component. Make sure you have the server running before using the CLI commands. You need to set the `TRANSCRIPTION_SERVER_URL` in your `.env` file. This should point to the URL where your transcription server is running (e.g., `http://localhost:8000`).
 
 - To use [deepgram](https://deepgram.com/) as a transcription service,
   you must have a valid `DEEPGRAM_API_KEY` in the `.env` file.
 
-- To push the resulting transcript to GitHub you need to fork
-  [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts)
-  and then clone your fork and define your `BITCOINTRANSCRIPTS_DIR` in the `.env` file.
-
-- To push the resulting transcript to a Queuer backend, you must have a 
-  valid `QUEUE_ENDPOINT` in the `.env` file. If not, you can instead save
-  the payload in a json file using the `--noqueue` flag.
-
 - To enable pushing the models to a S3 bucket,
-    - [Install](https://aws.amazon.com/cli/) aws-cli to your system.
-    - [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
-      aws-cli by first generating IAM credentials (if not already present) and
-      using `aws configure` to set them.
-    - To verify proper configuration, run `aws s3 ls` to show the list of S3
-      buckets. Don't forget to set a valid `S3_BUCKET` in the `.env` file.
+
+  - [Install](https://aws.amazon.com/cli/) aws-cli to your system.
+  - [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
+    aws-cli by first generating IAM credentials (if not already present) and
+    using `aws configure` to set them.
+  - To verify proper configuration, run `aws s3 ls` to show the list of S3
+    buckets. Don't forget to set a valid `S3_BUCKET` in the `.env` file.
 
 - To be able to convert the intermediary media files to mp3, install `FFmpeg`
 
-    - for Mac Os users, run `brew install ffmpeg`
+  - for Mac Os users, run `brew install ffmpeg`
 
-    - for other users, follow the instruction on
-      their [site](https://ffmpeg.org/) to install
+  - for other users, follow the instruction on
+    their [site](https://ffmpeg.org/) to install
 
 - To use a specific [configuration profile](#configuration), set the `PROFILE` variable in your `.env` file.
-
 
 ## Configuration
 
@@ -73,60 +65,92 @@ Additionally, the configuration file can include options not available through t
 
 An example configuration file named `config.ini.example` is included in the repository.
 To use it, copy it to `config.ini` and modify it according to your needs:
+
 ```sh
 cp config.ini.example config.ini
 ```
 
-## Install/Uninstall
+## Installation and Setup
 
-Navigate to the application directory and run the below commands:
+```sh
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-`python3 -m venv venv` creates a virtual environment
+# Install the application
+pip3 install .
+# With Whisper support
+pip3 install .[whisper]
+# In edit/dev mode
+pip3 install -e .
 
-`source venv/bin/activate` activates the virtual environment
+# Create .env file with required variables
+# See Prerequisites section
 
-`pip3 install .` to install the application
+# Verify installation
+tstbtc --version
+tstbtc --help
+```
 
-`tstbtc --version` view the application version
-
-`tstbtc --help` view the application help
-
-`pip3 uninstall tstbtc` to uninstall the application
+To uninstall: `pip3 uninstall tstbtc`
 
 ## Usage
 
-`tstbtc transcribe {source_file/url}` transcribe the given source
+The application has a server component that handles the transcription processing. This allows the heavy lifting of transcription to be done on a separate machine if desired. The CLI can automatically start this server locally when needed, or you can manage it manually.
 
-Suported sources:
-  - YouTube videos and playlists
-  - Local and remote audio files
-  - JSON files containing individual sources
+### Server Management
 
-Note:
-- The https links need to be wrapped in quotes when running the command on zsh
+**Automatic Mode** (default):
+- CLI starts server automatically when needed
+- Control with `--auto-server`, `--server-mode`, `--server-verbose` flags
+  ```
 
-To include optional metadata in your transcript, you can add the following
-parameters:
+**Manual Mode**:
+```sh
+# Start server
+tstbtc server start
 
-- `--loc`: Add the location in the bitcointranscripts hierarchy that you want to associate the transcript [default: "misc"]
-- `-t` or `--title`: Add the title for the resulting transcript (required for audio files)
-- `-d` or `--date`: Add the event date to transcript's metadata in format 'yyyy-mm-dd'
-- can be used multiple times:
-  - `-T` or `--tags`: Add a tag to transcript's metadata
-  - `-s` or `--speakers`: Add a speaker to the transcript's metadata
-  - `-c` or `--category`: Add a category to the transcript's metadata
+# Check status
+tstbtc server status
 
-To configure the transcription process, you can use the following flags:
+# Stop server
+tstbtc server stop
 
-- `-m` or `--model`: Select which whisper model to use for the transcription [default: tiny.en]
-- `-D` or `--deepgram`: Use deepgram for transcription, instead of using the whisper model [default: False]
-- `-M` or `--diarize`: Supply this flag if you have multiple speakers AKA want to diarize the content [only available with deepgram]
-- `-S` or `--summarize`: Summarize the transcript [only available with deepgram]
-- `--github`: Specify the GitHub operation mode
-- `-u` or `--upload`: Upload processed model files to AWS S3
-- `--markdown`: Save the resulting transcript to a markdown format supported by bitcointranscripts
-- `--noqueue`: Do not push the resulting transcript to the Queuer, instead store the payload in a json file
-- `--nocleanup`: Do not remove temp files on exit
+# View logs
+tstbtc server logs [--follow] [--lines 100]
+```
+
+### Using the CLI
+
+```sh
+# Basic usage
+tstbtc transcribe <source_file/url>
+```
+
+**Supported Sources**:
+- YouTube videos and playlists
+- Local and remote audio files
+- JSON files containing individual sources
+
+**Metadata Parameters**:
+- `--loc`: Location in bitcointranscripts hierarchy [default: "misc"]
+- `--title`: Title for transcript (required for audio files)
+- `--date`: Event date (yyyy-mm-dd)
+- `--tags`: Add tags (can use multiple times)
+- `--speakers`: Add speakers (can use multiple times)
+- `--category`: Add categories (can use multiple times)
+
+**Transcription Options**:
+- `--model`: Select whisper model [default: tiny.en]
+- `--deepgram`: Use Deepgram instead of Whisper
+- `--diarize`: Enable speaker diarization (Deepgram only)
+- `--summarize`: Generate summary (Deepgram only)
+- `--github`: Push to GitHub
+- `--upload`: Upload to AWS S3
+- `--markdown`: Save as markdown
+- `--text`: Save as txt
+- `--json`: Save as JSON
+- `--nocleanup`: Keep temporary files
 
 ### Examples
 
@@ -138,26 +162,72 @@ long argument tags. The result is the same.
 - `tstbtc transcribe Nq6WxJ0PgJ4 --loc "stephan-livera-podcast" -t 'OP_Vault - A New Way to HODL?' -d '2023-01-30' -T 'script' -T 'op_vault' -s 'James O’Beirne' -s 'Stephan Livera' -c ‘podcast’`
 - `tstbtc transcribe Nq6WxJ0PgJ4 --loc "stephan-livera-podcast" --title 'OP_Vault - A New Way to HODL?' --date '2023-01-30' --tags 'script' --tags 'op_vault' --speakers 'James O’Beirne' --speakers 'Stephan Livera' --category ‘podcast’`
 
-You can also transcribe a remote audio/mp3 link, such as the following from Stephan Livera's podcast: 
+You can also transcribe a remote audio/mp3 link, such as the following from Stephan Livera's podcast:
+
 ```shell
 mp3_link="https://anchor.fm/s/7d083a4/podcast/play/64348045/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2023-1-1%2Ff7fafb12-9441-7d85-d557-e9e5d18ab788.mp3"
 tstbtc transcribe $mp3_link --loc "stephan-livera-podcast" --title 'SLP455 Anant Tapadia - Single Sig or Multi Sig?' --date '2023-02-01' --tags 'multisig' --speakers 'Anant Tapadia' --speakers 'Stephan Livera' --category 'podcast'
 ```
 
+## GitHub Integration
+
+To push the resulting transcript(s) to GitHub:
+
+1. Ensure a GitHub App is created and installed on both the main repository and the metadata repository you want to push data to. The app should have the necessary permissions for content manipulation and pull request creation.
+2. Add these to your `.env` file:
+   ```
+   GITHUB_APP_ID=your_app_id
+   GITHUB_PRIVATE_KEY_BASE64=your_base64_encoded_private_key
+   GITHUB_INSTALLATION_ID=your_installation_id
+   GITHUB_REPO_OWNER=target_repo_owner
+   GITHUB_REPO_NAME=target_repo_name
+   GITHUB_METADATA_REPO_NAME=target_metadata_repo_name
+   ```
+   Replace the placeholders with your actual GitHub App details and target repository information.
+3. Use the `--github` flag when running the script to automatically create a branch in the target repositories and submit pull requests with the new transcripts and associated metadata.
+
+To convert your GitHub App private key file to base64, use the following command:
+
+```
+base64 -w 0 path/to/your/private-key.pem
+```
+
+## Docker Support
+
+This application can be run using Docker Compose, which simplifies the process of running both the server and CLI components.
+
+Quick start:
+
+1. Start the server:
+
+   ```sh
+   docker-compose up server
+   ```
+
+2. Use the CLI:
+   ```sh
+   docker-compose run --rm cli [command] [arguments]
+   ```
+
+For detailed instructions on using Docker with this project, including how to work with local files, environment variables, and custom builds, please refer to our [Docker Guide](docs/docker-guide.md).
+
 ## Testing
 
-To run the unit tests
+The transcription tool includes a comprehensive test suite built using pytest.
 
-`pytest -v -m main -s`
+```sh
+# Run all tests
+pytest
 
-To run the feature tests
+# Run specific test categories
+pytest -m unit       # Run only unit tests
+pytest -m exporters  # Run only exporter-related tests
 
-`pytest -v -m feature -s`
+# Run with coverage report
+pytest --cov=app
+```
 
-To run the full test suite
-
-`pytest -v -s`
-
+For detailed documentation on the testing infrastructure, test organization, and how to add new tests, please see the [tests directory README](tests/README.md).
 
 ## License
 

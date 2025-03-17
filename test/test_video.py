@@ -26,22 +26,21 @@ def test_video_with_title():
     category = None
     date = None
     transcription = Transcription(
-        username=username,
         test_mode=True,
     )
     transcription.add_transcription_source(
         source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start()
 
-    assert os.path.isfile(transcripts[0]["markdown"])
+    assert os.path.isfile(transcripts[0].outputs["markdown"])
     check_md_file(
-        path=transcripts[0]["markdown"],
+        path=transcripts[0].outputs["markdown"],
         transcript_by=username,
         media=source,
         title=title,
         date=date,
         tags=tags,
-        category=category,
+        categories=category,
         speakers=speakers,
         local=True,
     )
@@ -55,26 +54,25 @@ def test_video_with_all_options():
     title = "test_video"
     speakers = ["speaker1", "speaker2"]
     tags = ["tag1", "tag2"]
-    category = "category"
+    category = ["category"]
     date = "2020-01-31"
 
     transcription = Transcription(
-        username=username,
         test_mode=True,
     )
     transcription.add_transcription_source(
         source_file=source, title=title, date=date, tags=tags, category=category, speakers=speakers)
     transcripts = transcription.start()
-    assert os.path.isfile(transcripts[0]["markdown"])
+    assert os.path.isfile(transcripts[0].outputs["markdown"])
 
     check_md_file(
-        path=transcripts[0]["markdown"],
+        path=transcripts[0].outputs["markdown"],
         transcript_by=username,
         media=source,
         title=title,
         date=date,
         tags=tags,
-        category=category,
+        categories=category,
         speakers=speakers,
         local=True,
     )
@@ -91,11 +89,10 @@ def test_video_with_chapters():
     title = "test_video"
     speakers = ["speaker1", "speaker2"]
     tags = ["tag1", "tag2"]
-    category = "category"
+    category = ["category"]
     date = "2020-01-31"
 
     transcription = Transcription(
-        username=username,
         test_mode=True,
     )
     transcription.add_transcription_source(
@@ -110,15 +107,15 @@ def test_video_with_chapters():
                 chapter_names.append(x.split("= ")[1].strip())
         file.close()
 
-    assert os.path.isfile(transcripts[0]["markdown"])
+    assert os.path.isfile(transcripts[0].outputs["markdown"])
     check_md_file(
-        path=transcripts[0]["markdown"],
+        path=transcripts[0].outputs["markdown"],
         transcript_by=username,
         media=source,
         title=title,
         date=date,
         tags=tags,
-        category=category,
+        categories=category,
         speakers=speakers,
         chapters=chapter_names,
         local=True,

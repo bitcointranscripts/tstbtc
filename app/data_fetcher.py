@@ -32,7 +32,7 @@ class DataFetcher:
 
         if cache and cached_file_path and os.path.exists(cached_file_path):
             # Load data from the local file
-            logger.info(f"Fetched data from {cached_file_path}")
+            logger.debug(f"Fetched data from {cached_file_path}")
             with open(cached_file_path, "r") as file:
                 return json.load(file)
 
@@ -41,7 +41,7 @@ class DataFetcher:
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
-            logger.info(f"Fetched data from {url} (cache={cache})")
+            logger.debug(f"Fetched data from {url} (cache={cache})")
             if cache and cached_file_path:
                 # Store the fetched data locally
                 with open(cached_file_path, "w") as file:
@@ -56,7 +56,7 @@ class DataFetcher:
         data = self.fetch_json("status")
         return {value: True for value in data.get("existing", {}).get("media", [])}
 
-    def get_transcription_queue(self) -> List[str]:
+    def get_transcription_backlog(self) -> List[str]:
         """Returns a list of items that need transcription"""
         data = self.fetch_json("status")
         return data.get("needs", {}).get("transcript", [])

@@ -4,14 +4,13 @@ import os
 import re
 
 import deepgram
-from dotenv import dotenv_values
 import librosa
 
 from app import (
     application,
     utils
 )
-from app.config import config as config_profile
+from app.config import settings
 from app.data_writer import DataWriter
 from app.logging import get_logger
 from app.media_processor import MediaProcessor
@@ -34,18 +33,19 @@ class Deepgram:
         self.diarize = diarize
         self.upload = upload
         self.data_writer = data_writer
-        self.one_sentence_per_line = config_profile.getboolean('one_sentence_per_line', True)
+        self.one_sentence_per_line = settings.config.getboolean('one_sentence_per_line', True)
+        self.dpe_output = settings.config.getboolean('dpe_output', True)
         self.dev_mode = False  # Extra capabilities during development mode
         self.max_audio_length = 3600.0  # 60 minutes in seconds
         self.processor = MediaProcessor(chunk_length=1200.0)
+        self.api_key = settings.DEEPGRAM_API_KEY
 
     def audio_to_text(self, audio_file, chunk=None):
-        language = config_profile.get('language','en')
+        language = settings.config.get('language','en')
         logger.info(
             f"Transcribing audio {f'(chunk {chunk}) ' if chunk else ''}to text using deepgram[{language}]...")
         try:
-            config = dotenv_values(".env")
-            dg_client = deepgram.Deepgram(config["DEEPGRAM_API_KEY"])
+            dg_client = deepgram.Deepgram(self.api_key)
 
             with open(audio_file, "rb") as audio:
                 mimeType = mimetypes.MimeTypes().guess_type(audio_file)[0]
@@ -93,7 +93,9 @@ class Deepgram:
             raise
 
     def process_summary(self, transcript: Transcript):
-        with open(transcript.transcription_service_output_file, "r") as outfile:
+        if not transcript.outputs["transcription_service_output_file"]:
+            raise Exception("No 'deepgram_output' found in JSON")
+        with open(transcript.outputs["transcription_service_output_file"], "r") as outfile:
             transcription_service_output = json.load(outfile)
 
         try:
@@ -520,11 +522,11 @@ class Deepgram:
         except Exception as e:
             raise Exception(f"Error creating output format: {e}")
 
-    def finalize_transcript(self, transcript: Transcript):
+    def finalize_transcript(self, transcript: Transcript) -> None:
         try:
-            if not transcript.transcription_service_output_file:
+            if not transcript.outputs["transcription_service_output_file"]:
                 raise Exception("No 'deepgram_output' found in JSON")
-            with open(transcript.transcription_service_output_file, "r") as outfile:
+            with open(transcript.outputs["transcription_service_output_file"], "r") as outfile:
                 transcription_service_output = json.load(outfile)
 
             has_diarization = any(
@@ -540,14 +542,14 @@ class Deepgram:
                 speaker_segements_with_sentences)
             adjusted_chapters = self.adjust_chapter_timestamps(
                 speaker_segements_with_sentences, transcript.source.chapters)
-            dpe_format = self.transform_to_digital_paper_edit_format(
+            if self.dpe_output:
+                dpe_format = self.transform_to_digital_paper_edit_format(
+                    speaker_segements_with_sentences, adjusted_chapters)
+                transcript.outputs["dpe_file"] = self.data_writer.write_json(
+                    data=dpe_format, file_path=transcript.output_path_with_title, filename="dpe", include_timestamp=False)
+            
+            transcript.outputs["raw"] = self.construct_transcript(
                 speaker_segements_with_sentences, adjusted_chapters)
-            self.data_writer.write_json(
-                data=dpe_format, file_path=transcript.output_path_with_title, filename="dpe", include_timestamp=False)
-            result = self.construct_transcript(
-                speaker_segements_with_sentences, adjusted_chapters)
-
-            return result
         except Exception as e:
             raise Exception(f"(deepgram) Error finalizing transcript: {e}")
 
@@ -668,7 +670,7 @@ class Deepgram:
 
         return transcription_service_output
 
-    def transcribe(self, transcript: Transcript):
+    def transcribe(self, transcript: Transcript) -> None:
         try:
             audio_duration = librosa.get_duration(
                 path=transcript.audio_file)
@@ -683,15 +685,13 @@ class Deepgram:
                 transcription_service_output = self.audio_to_text(
                     transcript.audio_file)
 
-            transcript.transcription_service_output_file = self.write_to_json_file(
+            transcript.outputs["transcription_service_output_file"] = self.write_to_json_file(
                 transcription_service_output, transcript)
             if self.upload:
                 application.upload_file_to_s3(
-                    transcript.transcription_service_output_file)
+                    transcript.outputs["transcription_service_output_file"])
             if self.summarize:
                 transcript.summary = self.process_summary(transcript)
-            transcript.result = self.finalize_transcript(transcript)
-
-            return transcript
+            self.finalize_transcript(transcript)
         except Exception as e:
             raise Exception(f"(deepgram) Error while transcribing: {e}")

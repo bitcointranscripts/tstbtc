@@ -1,20 +1,19 @@
 import json
 import logging
-import tempfile
 import traceback
-
+import os
 import click
 
-from app import (
-    __app_name__,
-    __version__,
-    commands,
-    utils
+from app import __app_name__, __version__, commands, utils
+from app.api_client import APIClient
+from app.commands.cli_utils import (
+    get_transcription_url, 
+    auto_start_server
 )
-from app.config import config
+from app.config import settings
+from app.data_writer import DataWriter
 from app.logging import configure_logger, get_logger
 from app.transcription import Transcription
-from app.types import GitHubMode
 
 logger = get_logger()
 
@@ -25,6 +24,7 @@ def print_version(ctx, param, value):
     click.echo(f"{__app_name__} v{__version__}")
     ctx.exit()
 
+
 @click.option(
     "-v",
     "--version",
@@ -34,15 +34,45 @@ def print_version(ctx, param, value):
     is_eager=True,
     help="Show the application's version and exit.",
 )
+@click.option(
+    "--auto-server",
+    is_flag=True,
+    default=settings.config.getboolean("auto_server", True),
+    help="Automatically start the server if it's not running (default: True)",
+    show_default=True,
+)
+@click.option(
+    "--server-mode",
+    type=click.Choice(["dev", "prod"]),
+    default=settings.config.get("server_mode", "prod"),
+    help="Mode to use when automatically starting the server",
+    show_default=True,
+)
+@click.option(
+    "--server-verbose",
+    is_flag=True,
+    default=settings.config.getboolean("server_verbose", False),
+    help="Show server output directly in the console when auto-starting",
+    show_default=True,
+)
 @click.group()
-def cli():
+@click.pass_context
+def cli(ctx, auto_server, server_mode, server_verbose):
+    # Store auto_server and server_mode in the context for use in ServerCheckGroup
+    ctx.obj = {
+        "auto_server": auto_server,
+        "server_mode": server_mode,
+        "server_verbose": server_verbose
+    }
     pass
+
 
 def print_help(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
     logging.info(ctx.get_help())
     ctx.exit()
+
 
 whisper = click.option(
     "-m",
@@ -60,7 +90,7 @@ whisper = click.option(
             "large-v2",
         ]
     ),
-    default=config.get('model', 'tiny.en'),
+    default=settings.config.get("model", "tiny.en"),
     show_default=True,
     help="Select which whisper model to use for the transcription",
 )
@@ -68,14 +98,16 @@ deepgram = click.option(
     "-D",
     "--deepgram",
     is_flag=True,
-    default=config.getboolean('deepgram', False),
+    default=settings.config.getboolean("deepgram", False),
+    show_default=True,
     help="Use deepgram for transcription",
 )
 diarize = click.option(
     "-M",
     "--diarize",
     is_flag=True,
-    default=config.getboolean('diarize', False),
+    default=settings.config.getboolean("diarize", False),
+    show_default=True,
     help="Supply this flag if you have multiple speakers AKA "
     "want to diarize the content",
 )
@@ -83,73 +115,91 @@ summarize = click.option(
     "-S",
     "--summarize",
     is_flag=True,
-    default=config.getboolean('summarize', False),
+    default=settings.config.getboolean("summarize", False),
+    show_default=True,
     help="Summarize the transcript [only available with deepgram]",
 )
 cutoff_date = click.option(
     "--cutoff-date",
     type=str,
-    default=config.get('cutoff_date', None),
-    help=("Specify a cutoff date (in YYYY-MM-DD format) to process only sources "
-          "published after this date. Sources with a publication date on or before "
-          "the cutoff will be excluded from processing. This option is useful for "
-          "focusing on newer content or limiting the scope of processing to a "
-          "specific date range.")
+    default=settings.config.get("cutoff_date", None),
+    help=(
+        "Specify a cutoff date (in YYYY-MM-DD format) to process only sources "
+        "published after this date. Sources with a publication date on or before "
+        "the cutoff will be excluded from processing. This option is useful for "
+        "focusing on newer content or limiting the scope of processing to a "
+        "specific date range."
+    ),
+)
+username = click.option(
+    "--username",
+    type=str,
+    default=settings.config.get("username", None),
+    help=("Specify a username for transcription attribution."),
 )
 github = click.option(
     "--github",
-    type=click.Choice(["remote", "local", "none"]),
-    default=config.get('github', 'none'),
-    help=("Specify the GitHub operation mode."
-          "'remote': Create a new branch, push changes to it, and push it to the origin bitcointranscripts repo. "
-          "'local': Commit changes to the current local branch without pushing to the remote repo."
-          "'none': Do not perform any GitHub operations."),
-    show_default=True
+    is_flag=True,
+    default=settings.config.getboolean("github", False),
+    help="Push the resulting transcript(s) to GitHub",
+    show_default=True,
 )
 upload_to_s3 = click.option(
     "-u",
     "--upload",
     is_flag=True,
-    default=config.getboolean('upload_to_s3', False),
+    default=settings.config.getboolean("upload_to_s3", False),
     help="Upload processed model files to AWS S3",
 )
 save_to_markdown = click.option(
     "--markdown",
     is_flag=True,
-    default=config.getboolean('save_to_markdown', False),
-    help="Save the resulting transcript to a markdown format supported by bitcointranscripts",
+    default=settings.config.getboolean("save_to_markdown", False),
+    help="Save the resulting transcript to a markdown format",
 )
-noqueue = click.option(
-    "--noqueue",
+save_to_text = click.option(
+    "--text",
     is_flag=True,
-    default=config.getboolean('noqueue', False),
-    help="Do not push the resulting transcript to the Queuer backend",
+    default=settings.config.getboolean("save_to_text", False),
+    help="Save the resulting transcript to a plain text file",
+)
+markdown_no_metadata = click.option(
+    "--no-metadata",
+    is_flag=True,
+    default=settings.config.getboolean("no_metadata", False),
+    help="Don't include metadata in the markdown output",
+)
+save_to_json = click.option(
+    "--json",
+    is_flag=True,
+    default=settings.config.getboolean("save_to_json", False),
+    help="Save the resulting transcript to a JSON format",
 )
 needs_review = click.option(
     "--needs-review",
     is_flag=True,
-    default=config.getboolean('needs_review', False),
+    default=settings.config.getboolean("needs_review", False),
     help="Add 'needs review' flag to the resulting transcript",
 )
 model_output_dir = click.option(
     "-o",
     "--model_output_dir",
     type=str,
-    default=config.get('model_output_dir', 'local_models/'),
+    default=settings.config.get("model_output_dir", "local_models/"),
     show_default=True,
     help="Set the directory for saving model outputs",
 )
 nocleanup = click.option(
     "--nocleanup",
     is_flag=True,
-    default=config.getboolean('nocleanup', False),
+    default=settings.config.getboolean("nocleanup", False),
     help="Do not remove temp files on exit",
 )
 verbose_logging = click.option(
     "-V",
     "--verbose",
     is_flag=True,
-    default=config.getboolean('verbose_logging', False),
+    default=settings.config.getboolean("verbose_logging", False),
     help="Supply this flag to enable verbose logging",
 )
 
@@ -189,6 +239,7 @@ add_category = click.option(
     help="Add a category to the transcript's metadata (can be used multiple times)",
 )
 
+
 @cli.command()
 @click.argument("source", nargs=1)
 # Available transcription models and services
@@ -207,15 +258,19 @@ add_category = click.option(
 # Options for configuring the transcription preprocess
 @cutoff_date
 # Options for configuring the transcription postprocess
+@username
 @github
 @upload_to_s3
 @save_to_markdown
-@noqueue
+@save_to_text
+@markdown_no_metadata
+@save_to_json
 @needs_review
 # Configuration options
 @model_output_dir
 @nocleanup
 @verbose_logging
+@auto_start_server
 def transcribe(
     source: str,
     loc: str,
@@ -225,7 +280,8 @@ def transcribe(
     tags: list,
     speakers: list,
     category: list,
-    github: GitHubMode,
+    username: str,
+    github: bool,
     deepgram: bool,
     summarize: bool,
     diarize: bool,
@@ -233,8 +289,10 @@ def transcribe(
     verbose: bool,
     model_output_dir: str,
     nocleanup: bool,
-    noqueue: bool,
+    json: bool,
     markdown: bool,
+    text: bool,
+    no_metadata: bool,
     needs_review: bool,
     cutoff_date: str,
 ) -> None:
@@ -248,50 +306,56 @@ def transcribe(
     on zsh\n
     - The JSON can be generated by `preprocess-sources` or created manually
     """
-    tmp_dir = tempfile.mkdtemp()
-    configure_logger(logging.DEBUG if verbose else logging.INFO, tmp_dir)
+    configure_logger(log_level=logging.INFO)
+    url = get_transcription_url()
+    api_client = APIClient(url)
 
-    logger.info(
-        "This tool will convert Youtube videos to mp3 files and then "
-        "transcribe them to text using Whisper. "
-    )
+    data = {
+        "loc": loc,
+        "model": model,
+        "title": title,
+        "date": date,
+        "tags": list(tags),
+        "speakers": list(speakers),
+        "category": list(category),
+        "username": username,
+        "github": github,
+        "deepgram": deepgram,
+        "summarize": summarize,
+        "diarize": diarize,
+        "upload": upload,
+        "verbose": verbose,
+        "model_output_dir": model_output_dir,
+        "nocleanup": nocleanup,
+        "json": json,
+        "markdown": markdown,
+        "text": text,
+        "include_metadata": not no_metadata,
+        "needs_review": needs_review,
+        "cutoff_date": cutoff_date,
+    }
     try:
-        transcription = Transcription(
-            model=model,
-            github=github,
-            summarize=summarize,
-            deepgram=deepgram,
-            diarize=diarize,
-            upload=upload,
-            model_output_dir=model_output_dir,
-            nocleanup=nocleanup,
-            queue=not noqueue,
-            markdown=markdown,
-            needs_review=needs_review,
-            working_dir=tmp_dir
-        )
-        if source.endswith(".json"):
-            transcription.add_transcription_source_JSON(source)
-        else:
-            transcription.add_transcription_source(
-                source_file=source,
-                loc=loc,
-                title=title,
-                date=date,
-                tags=list(tags),
-                category=list(category),
-                speakers=list(speakers),
-                cutoff_date=cutoff_date
-            )
-        transcription.start()
-        if nocleanup:
-            logger.info("Not cleaning up temp files...")
-        else:
-            transcription.clean_up()
+        queue_response = api_client.add_to_queue(data, source)
+        logger.info(queue_response)
+
+        start_response = api_client.start_transcription()
+        logger.info(start_response)
     except Exception as e:
-        logger.error(e)
-        logger.info(f"Exited with error, not cleaning up temp files: {tmp_dir}")
-        traceback.print_exc()
+        logger.error(f"Transcription operation failed: {e}")
+
+
+@cli.command()
+def get_queue():
+    """Get the transcription queue"""
+    configure_logger(log_level=logging.INFO)
+    url = get_transcription_url()
+    api_client = APIClient(url)
+
+    try:
+        response = api_client.get_queue()
+        logger.info(response)
+    except Exception as e:
+        logger.error(f"Failed to get queue: {e}")
 
 
 @cli.command()
@@ -304,12 +368,6 @@ def transcribe(
     default=False,
     help="Do not check for existing sources using btctranscripts.com/status.json",
 )
-@click.option(
-    "--no-batched-output",
-    is_flag=True,
-    default=False,
-    help="Output preprocessing output in a different JSON file for each source",
-)
 # Options for adding metadata
 @add_title
 @add_date
@@ -317,6 +375,7 @@ def transcribe(
 @add_speakers
 @add_category
 @add_loc
+@auto_start_server
 def preprocess(
     source: str,
     loc: str,
@@ -326,8 +385,7 @@ def preprocess(
     speakers: list,
     category: list,
     nocheck: bool,
-    no_batched_output: bool,
-    cutoff_date: str
+    cutoff_date: str,
 ):
     """Preprocess the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -337,33 +395,32 @@ def preprocess(
     in a JSON alongside the available metadata.
     The JSON can then be edited and piped to `transcribe`
     """
+    configure_logger(log_level=logging.INFO)
+    url = get_transcription_url()
+    api_client = APIClient(url)
+
+    data = {
+        "loc": loc,
+        "title": title,
+        "date": date,
+        "tags": list(tags),
+        "speakers": list(speakers),
+        "category": list(category),
+        "nocheck": nocheck,
+        "cutoff_date": cutoff_date,
+    }
+
     try:
-        configure_logger(log_level=logging.INFO)
-        logger.info(f"Preprocessing sources...")
-        transcription = Transcription(
-            queue=False,
-            batch_preprocessing_output=not no_batched_output)
-        if source.endswith(".json"):
-            transcription.add_transcription_source_JSON(source, nocheck=nocheck)
-        else:
-            transcription.add_transcription_source(
-                source_file=source,
-                loc=loc,
-                title=title,
-                date=date,
-                tags=tags,
-                category=category,
-                speakers=speakers,
-                preprocess=True,
-                nocheck=nocheck,
-                cutoff_date=cutoff_date
-            )
-        if not no_batched_output:
-            # Batch write all preprocessed sources to JSON
-            utils.write_to_json([preprocessed_source for preprocessed_source in transcription.preprocessing_output],
-                                transcription.model_output_dir, "preprocessed_sources")
+        response_data = api_client.preprocess_source(data, source)
+        data_writer = DataWriter("local_models/")
+        file_path = data_writer.write_json(
+            data=response_data.json()["data"],
+            file_path="",
+            filename="preprocessed_sources",
+        )
+        logger.info(f"Data successfully written to {file_path}")
     except Exception as e:
-        logger.info(f"Exited with error: {e}")
+        logger.error(f"Preprocessing operation failed: {e}")
 
 
 @cli.command()
@@ -379,18 +436,22 @@ def preprocess(
 )
 @click.argument("metadata_json_file", nargs=1)
 # Options for configuring the transcription postprocess
+@username
 @github
 @upload_to_s3
 @save_to_markdown
-@noqueue
+@save_to_text
+@save_to_json
 @needs_review
 def postprocess(
     metadata_json_file,
     service,
-    github: GitHubMode,
+    username: str,
+    github: bool,
     upload: bool,
     markdown: bool,
-    noqueue: bool,
+    text: bool,
+    json: bool,
     needs_review: bool,
 ):
     """Postprocess the output of a transcription service.
@@ -404,8 +465,10 @@ def postprocess(
             deepgram=service == "deepgram",
             github=github,
             upload=upload,
+            username=username,
             markdown=markdown,
-            queue=not noqueue,
+            text_output=text,
+            json=json,
             needs_review=needs_review,
         )
         logger.info(
@@ -433,7 +496,7 @@ def postprocess(
             cutoff_date=metadata["cutoff_date"]
         )
         # Finalize transcription service output
-        transcript_to_postprocess = transcription.transcripts[0]
+        transcript = transcription.transcripts[0]
         if metadata.get("deepgram_chunks"):
             logger.info("Combining deepgram chunk outputs...")
             all_chunks_output = []
@@ -443,24 +506,24 @@ def postprocess(
             overlap_between_chunks = 30.0  # or any other value used during splitting
             transcription_service_output = transcription.service.combine_chunk_outputs(
                 all_chunks_output, overlap=overlap_between_chunks)
-            transcript_to_postprocess.transcription_service_output_file = transcription.service.write_to_json_file(
-                transcription_service_output, transcript_to_postprocess)
+            transcript.outputs["transcription_service_output_file"] = transcription.service.write_to_json_file(
+                transcription_service_output, transcript)
         else:
-            transcript_to_postprocess.transcription_service_output_file = metadata[
-                f"{service}_output"]
+            transcript.outputs["transcription_service_output_file"] = metadata[f"{service}_output"]
 
-        transcript_to_postprocess.result = transcription.service.finalize_transcript(
-            transcript_to_postprocess)
-        postprocessed_transcript = transcription.postprocess(
-            transcript_to_postprocess)
+        transcription.service.finalize_transcript(transcript)
+        transcription.postprocess(transcript)
 
-        if transcription.bitcointranscripts_dir:
-            transcription.push_to_github([postprocessed_transcript])
+        if transcription.github:
+            transcription.push_to_github([transcript])
     except Exception as e:
         logger.error(e)
         traceback.print_exc()
 
-cli.add_command(commands.queue)
 
-if __name__ == '__main__':
+cli.add_command(commands.media)
+cli.add_command(commands.curator)
+cli.add_command(commands.server)
+
+if __name__ == "__main__":
     cli()
