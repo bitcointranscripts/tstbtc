@@ -270,7 +270,7 @@ class JsonExporter(TranscriptExporter):
         self.logger.debug("Exporting transcript to JSON...")
 
         # Get parameters
-        add_timestamp = kwargs.get("add_timestamp", True)
+        add_timestamp = kwargs.get("add_timestamp", False)
 
         # Get output directory
         output_dir = self.get_output_path(transcript)
@@ -288,7 +288,7 @@ class JsonExporter(TranscriptExporter):
         # Construct file path
         file_path = self.construct_file_path(
             directory=output_dir,
-            filename=f"{transcript.title}_payload",
+            filename=transcript.title,
             file_type="json",
             include_timestamp=add_timestamp,
         )
@@ -378,7 +378,7 @@ class ExporterFactory:
             )
 
         # Create JSON exporter if needed
-        if config.get("noqueue", True):
+        if config.get("json", True):
             exporters["json"] = JsonExporter(
                 output_dir=config.get("model_output_dir", "local_models/"),
                 transcript_by=transcript_by,

@@ -51,7 +51,7 @@ async def preprocess(
     try:
         logger.info(f"Preprocessing sources...")
         transcription = Transcription(
-            queue=False, username="not-needed", batch_preprocessing_output=True
+            username="not-needed", batch_preprocessing_output=True
         )
 
         if source_file:
@@ -103,7 +103,7 @@ async def add_to_queue(
     model_output_dir: str = Form("local_models/"),
     username: str = Form(None),
     nocleanup: bool = Form(False),
-    noqueue: bool = Form(True),
+    json: bool = Form(False),
     markdown: bool = Form(False),
     text: bool = Form(False),
     no_metadata: bool = Form(False),
@@ -125,7 +125,7 @@ async def add_to_queue(
             model_output_dir=model_output_dir,
             username=username,
             nocleanup=nocleanup,
-            queue=not noqueue,
+            json=json,
             markdown=markdown,
             include_metadata=not no_metadata,
             text_output=text,

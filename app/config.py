@@ -67,14 +67,6 @@ class Settings:
         return self._get_env_variable('S3_BUCKET')
 
     @property
-    def QUEUE_ENDPOINT(self):
-        return self._get_env_variable('QUEUE_ENDPOINT')
-
-    @property
-    def BEARER_TOKEN(self):
-        return self._get_env_variable('BEARER_TOKEN')
-
-    @property
     def GITHUB_APP_ID(self):
         return self._get_env_variable('GITHUB_APP_ID',
             "To use GitHub App integration, you need to define a 'GITHUB_APP_ID' in your .env file")

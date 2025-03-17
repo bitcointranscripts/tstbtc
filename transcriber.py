@@ -169,11 +169,11 @@ markdown_no_metadata = click.option(
     default=settings.config.getboolean("no_metadata", False),
     help="Don't include metadata in the markdown output",
 )
-noqueue = click.option(
-    "--noqueue",
+save_to_json = click.option(
+    "--json",
     is_flag=True,
-    default=settings.config.getboolean("noqueue", False),
-    help="Do not push the resulting transcript to the Queuer backend",
+    default=settings.config.getboolean("save_to_json", False),
+    help="Save the resulting transcript to a JSON format",
 )
 needs_review = click.option(
     "--needs-review",
@@ -264,7 +264,7 @@ add_category = click.option(
 @save_to_markdown
 @save_to_text
 @markdown_no_metadata
-@noqueue
+@save_to_json
 @needs_review
 # Configuration options
 @model_output_dir
@@ -289,7 +289,7 @@ def transcribe(
     verbose: bool,
     model_output_dir: str,
     nocleanup: bool,
-    noqueue: bool,
+    json: bool,
     markdown: bool,
     text: bool,
     no_metadata: bool,
@@ -327,7 +327,7 @@ def transcribe(
         "verbose": verbose,
         "model_output_dir": model_output_dir,
         "nocleanup": nocleanup,
-        "noqueue": noqueue,
+        "json": json,
         "markdown": markdown,
         "text": text,
         "include_metadata": not no_metadata,
@@ -441,7 +441,7 @@ def preprocess(
 @upload_to_s3
 @save_to_markdown
 @save_to_text
-@noqueue
+@save_to_json
 @needs_review
 def postprocess(
     metadata_json_file,
@@ -451,7 +451,7 @@ def postprocess(
     upload: bool,
     markdown: bool,
     text: bool,
-    noqueue: bool,
+    json: bool,
     needs_review: bool,
 ):
     """Postprocess the output of a transcription service.
@@ -468,7 +468,7 @@ def postprocess(
             username=username,
             markdown=markdown,
             text_output=text,
-            queue=not noqueue,
+            json=json,
             needs_review=needs_review,
         )
         logger.info(
@@ -520,7 +520,6 @@ def postprocess(
         logger.error(e)
         traceback.print_exc()
 
-cli.add_command(commands.queue)
 cli.add_command(commands.curator)
 cli.add_command(commands.server)
 

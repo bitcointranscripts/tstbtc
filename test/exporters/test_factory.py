@@ -19,7 +19,7 @@ class TestExporterFactory:
         config = {
             "markdown": True,
             "text_output": True,
-            "noqueue": True,
+            "json": True,
             "model_output_dir": temp_dir,
         }
 
@@ -53,7 +53,7 @@ class TestExporterFactory:
         config = {
             "markdown": True,
             "text_output": False,
-            "noqueue": False,
+            "json": False,
             "model_output_dir": temp_dir,
         }
 
@@ -76,7 +76,7 @@ class TestExporterFactory:
         config = {
             "markdown": False,
             "text_output": False,
-            "noqueue": False,
+            "json": False,
             "model_output_dir": temp_dir,
         }
 
@@ -96,7 +96,7 @@ class TestExporterFactory:
         config = {
             "markdown": True,
             "text_output": True,
-            "noqueue": True,
+            "json": True,
             "model_output_dir": custom_dir,
         }
 
@@ -116,7 +116,7 @@ class TestExporterFactory:
         config = {
             "markdown": True,
             "text_output": True,
-            "noqueue": True,
+            "json": True,
             "model_output_dir": temp_dir,
         }
 

@@ -28,7 +28,6 @@ This transcription tool operates through a structured four-stage process:
    - **Push to GitHub**: Push transcripts to your fork of the [bitcointranscripts](https://github.com/bitcointranscripts/bitcointranscripts) repo.
    - **Markdown**: Saves transcripts in a markdown format supported by bitcointranscripts.
    - **Upload**: Saves transcripts in an AWS S3 Bucket.
-   - **Push to Queuer backend**: Sends transcripts to [a Queuer backend](https://github.com/bitcointranscripts/transcription-review-backend).
    - **Save as JSON**: Preserves transcripts for future use.
 
 ## Prerequisites
@@ -37,10 +36,6 @@ This transcription tool operates through a structured four-stage process:
 
 - To use [deepgram](https://deepgram.com/) as a transcription service,
   you must have a valid `DEEPGRAM_API_KEY` in the `.env` file.
-
-- To push the resulting transcript to a Queuer backend, you must have a
-  valid `QUEUE_ENDPOINT` in the `.env` file. If not, you can instead save
-  the payload in a json file using the `--noqueue` flag.
 
 - To enable pushing the models to a S3 bucket,
 
@@ -153,7 +148,8 @@ tstbtc transcribe <source_file/url>
 - `--github`: Push to GitHub
 - `--upload`: Upload to AWS S3
 - `--markdown`: Save as markdown
-- `--noqueue`: Skip pushing to Queuer
+- `--text`: Save as txt
+- `--json`: Save as JSON
 - `--nocleanup`: Keep temporary files
 
 ### Examples

@@ -23,7 +23,7 @@ class TestTranscriptionWithExporters:
             markdown=True,
             text_output=True,
             username="Test User",
-            queue=False,
+            json=True,
             include_metadata=True,
         )
 
@@ -44,7 +44,7 @@ class TestTranscriptionWithExporters:
         # Verify config
         assert config["markdown"] is True
         assert config["text_output"] is True
-        assert config["noqueue"] is True
+        assert config["json"] is True
         assert "model_output_dir" in config
 
         # Check transcript_by was passed correctly
@@ -81,37 +81,6 @@ class TestTranscriptionWithExporters:
 
         # Check the result
         assert result == "/path/to/exported/markdown.md"
-
-    def test_write_to_json_file(
-        self,
-        transcription_with_exporters,
-        mock_transcript,
-        mock_transcription_deps,
-    ):
-        """Test that write_to_json_file uses the json exporter"""
-        # Get the mock exporters
-        exporters = mock_transcription_deps[
-            "ExporterFactory"
-        ].create_exporters.return_value
-        json_exporter = exporters["json"]
-
-        # Set up the exporter to return a specific path
-        json_exporter.export.return_value = "/path/to/exported/transcript.json"
-
-        # Call the method
-        result = transcription_with_exporters.write_to_json_file(
-            mock_transcript
-        )
-
-        # Check that the exporter was called with the right parameters
-        json_exporter.export.assert_called_once()
-        call_kwargs = json_exporter.export.call_args[1]
-
-        assert call_kwargs["version"] == "1.0.0"
-        assert call_kwargs["add_timestamp"] is True
-
-        # Check the result
-        assert result == "/path/to/exported/transcript.json"
 
     def test_postprocess_with_markdown(
         self, transcription_with_exporters, mock_transcript
@@ -170,30 +139,33 @@ class TestTranscriptionWithExporters:
             == "/path/to/exported/transcript.txt"
         )
 
-    def test_postprocess_with_queuer(
-        self, patched_transcription, mock_transcript, mock_transcription_deps
+    def test_postprocess_with_json(
+        self, transcription_with_exporters, mock_transcript, mock_transcription_deps
     ):
-        """Test postprocess with queuer enabled"""
-        # Create a queuer mock
-        mock_queuer = mock.MagicMock()
-
-        # Configure a transcription instance with queuer and no exporters
-        from app.transcription import Transcription
-
-        mock_transcription_deps[
+        """Test postprocess with JSON output"""
+        # Get the mock exporters
+        exporters = mock_transcription_deps[
             "ExporterFactory"
-        ].create_exporters.return_value = {}
+        ].create_exporters.return_value
+        json_exporter = exporters["json"]
 
-        transcription = Transcription(
-            markdown=False, text_output=False, username="Test User", queue=True
+        # Set up the exporter to return a specific path
+        json_exporter.export.return_value = "/path/to/exported/transcript.json"
+
+        # Mock write_to_markdown_file to avoid calling it
+        transcription_with_exporters.write_to_markdown_file = mock.MagicMock()
+        transcription_with_exporters.write_to_markdown_file.return_value = (
+            "/path/to/exported/markdown.md"
         )
-        transcription.queuer = mock_queuer
 
         # Call postprocess
-        transcription.postprocess(mock_transcript)
+        transcription_with_exporters.postprocess(mock_transcript)
 
-        # Check that the queuer was called with the right data
-        mock_queuer.push_to_queue.assert_called_once()
-        transcript_json = mock_queuer.push_to_queue.call_args[0][0]
-        assert transcript_json["title"] == mock_transcript.title
-        assert transcript_json["transcript_by"] == "Test User via tstbtc v1.0.0"
+        # Check that the json exporter was called
+        json_exporter.export.assert_called_once()
+
+        # Check that the output was stored in the transcript
+        assert (
+            mock_transcript.outputs["json"]
+            == "/path/to/exported/transcript.json"
+        )

@@ -10,7 +10,6 @@ from app.exceptions import DuplicateSourceError
 from app.transcript import Transcript, Source, Audio, Video, Playlist, RSS
 from app import __app_name__, __version__, application, services, utils
 from app.logging import get_logger
-from app.queuer import Queuer
 from app.data_writer import DataWriter
 from app.data_fetcher import DataFetcher
 from app.github_api_handler import GitHubAPIHandler
@@ -28,7 +27,7 @@ class Transcription:
         upload=False,
         model_output_dir="local_models/",
         nocleanup=False,
-        queue=True,
+        json=False,
         markdown=False,
         text_output=False,
         username=None,
@@ -49,7 +48,6 @@ class Transcription:
         self.transcript_by = self.__configure_username(username)
         # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
-        self.text_output = text_output
         self.include_metadata = include_metadata
 
         self.metadata_writer = DataWriter(
@@ -59,8 +57,8 @@ class Transcription:
         # Create exporters for transcript output formats
         export_config = {
             "markdown": self.markdown,
-            "text_output": self.text_output,
-            "noqueue": not queue,
+            "text_output": text_output,
+            "json": json,
             "model_output_dir": model_output_dir,
         }
         self.exporters: dict[
@@ -86,8 +84,6 @@ class Transcription:
             self.service = services.Whisper(model, upload, self.metadata_writer)
 
         self.transcripts: list[Transcript] = []
-        # during testing we do not have/need a queuer backend
-        self.queuer = Queuer(test_mode=test_mode) if queue is True else None
         self.existing_media = None
         self.preprocessing_output = [] if batch_preprocessing_output else None
         self.data_fetcher = DataFetcher(base_url="http://btctranscripts.com")
@@ -482,29 +478,6 @@ class Transcription:
         except Exception as e:
             raise Exception(f"Error writing to markdown file: {e}")
 
-    def write_to_json_file(self, transcript: Transcript):
-        """
-        Legacy method that uses the JSON exporter to write a JSON file.
-        This maintains compatibility with existing code while using the new architecture.
-        """
-        self.logger.debug(
-            "Creating JSON file with transcription (using exporter)..."
-        )
-
-        try:
-            if "json" not in self.exporters:
-                raise Exception("JSON exporter not configured")
-
-            json_exporter = self.exporters["json"]
-            export_kwargs = {"version": __version__, "add_timestamp": True}
-
-            json_file = json_exporter.export(transcript, **export_kwargs)
-            self.logger.info(f"JSON file stored at: {json_file}")
-            return json_file
-
-        except Exception as e:
-            raise Exception(f"Error writing to JSON file: {e}")
-
     def postprocess(self, transcript: Transcript) -> None:
         """
         Process the transcript to produce output files in the configured formats.
@@ -518,8 +491,7 @@ class Transcription:
                     transcript,
                 )
 
-            # Handle text output with exporter
-            if self.text_output and "text" in self.exporters:
+            if "text" in self.exporters:
                 try:
                     transcript.outputs["text"] = self.exporters["text"].export(
                         transcript, add_timestamp=False
@@ -527,24 +499,10 @@ class Transcription:
                 except Exception as e:
                     self.logger.warning(f"Text exporter failed: {e}")
 
-            # Handle JSON output (for non-queued transcripts)
-            if (
-                not self.test_mode
-                and not self.markdown
-                and not self.github_handler
-            ):
-                transcript_json = transcript.to_json()
-                transcript_json[
-                    "transcript_by"
-                ] = f"{self.transcript_by} via tstbtc v{__version__}"
-
-                if self.queuer:
-                    self.queuer.push_to_queue(transcript_json)
-                else:
-                    # store payload for the user to manually send it to the queuer
-                    transcript.outputs["json"] = self.write_to_json_file(
-                        transcript
-                    )
+            if "json" in self.exporters:
+                transcript.outputs["json"] = self.exporters["json"].export(
+                    transcript
+                )
 
         except Exception as e:
             raise Exception(f"Error with postprocessing: {e}") from e

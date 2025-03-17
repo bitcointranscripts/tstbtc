@@ -126,7 +126,6 @@ def mock_transcription_deps():
         "settings": mock.MagicMock(),
         "services": mock.MagicMock(),
         "GitHubAPIHandler": mock.MagicMock(),
-        "Queuer": mock.MagicMock(),
         "DataFetcher": mock.MagicMock(),
         "DataWriter": mock.MagicMock(),
         "ExporterFactory": mock.MagicMock(),

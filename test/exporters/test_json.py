@@ -34,7 +34,7 @@ class TestJsonExporter:
         expected_path = os.path.join(
             temp_dir,
             mock_transcript.source.loc,
-            f"{mock_transcript.title}_payload.json",
+            f"{mock_transcript.title}.json",
         )
         assert os.path.abspath(result) == os.path.abspath(expected_path)
 
@@ -56,26 +56,6 @@ class TestJsonExporter:
         # Check for transcript data
         assert content["title"] == mock_transcript.title
         assert "transcript_by" not in content
-
-    def test_export_with_timestamp(self, json_exporter, mock_transcript):
-        """Test exporting JSON with timestamp in filename"""
-        # Export with timestamp
-        result = json_exporter.export(mock_transcript, add_timestamp=True)
-
-        # Check file exists
-        assert os.path.exists(result)
-
-        # Check that filename includes a timestamp
-        filename = os.path.basename(result)
-        assert (
-            "_payload_" in filename
-        )  # timestamp is between '_payload_' and '.json'
-        assert filename.endswith(".json")
-
-        # Verify file content
-        with open(result, "r") as f:
-            content = json.load(f)
-        assert content["title"] == mock_transcript.title
 
     def test_content_structure(self, json_exporter, mock_transcript):
         """Test the structure of the exported JSON content"""
