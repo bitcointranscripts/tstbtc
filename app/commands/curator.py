@@ -6,14 +6,14 @@ import requests
 from app import (
     logging,
 )
-from app.commands.cli_utils import ServerCheckGroup, get_transcription_url
+from app.commands.cli_utils import get_transcription_url
 from app.data_writer import DataWriter
 
 logger = logging.get_logger()
 
 data_writer = DataWriter(base_dir="curator/")
 
-@click.group(cls=ServerCheckGroup)
+@click.group()
 def curator():
     """Curator commands"""
     logging.configure_logger(log_level=syslogging.INFO)

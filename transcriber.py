@@ -1,12 +1,15 @@
 import json
 import logging
 import traceback
-
+import os
 import click
 
 from app import __app_name__, __version__, commands, utils
 from app.api_client import APIClient
-from app.commands.cli_utils import ServerCheckGroup, get_transcription_url
+from app.commands.cli_utils import (
+    get_transcription_url, 
+    auto_start_server
+)
 from app.config import settings
 from app.data_writer import DataWriter
 from app.logging import configure_logger, get_logger
@@ -31,8 +34,36 @@ def print_version(ctx, param, value):
     is_eager=True,
     help="Show the application's version and exit.",
 )
-@click.group(cls=ServerCheckGroup)
-def cli():
+@click.option(
+    "--auto-server",
+    is_flag=True,
+    default=settings.config.getboolean("auto_server", True),
+    help="Automatically start the server if it's not running (default: True)",
+    show_default=True,
+)
+@click.option(
+    "--server-mode",
+    type=click.Choice(["dev", "prod"]),
+    default=settings.config.get("server_mode", "prod"),
+    help="Mode to use when automatically starting the server",
+    show_default=True,
+)
+@click.option(
+    "--server-verbose",
+    is_flag=True,
+    default=settings.config.getboolean("server_verbose", False),
+    help="Show server output directly in the console when auto-starting",
+    show_default=True,
+)
+@click.group()
+@click.pass_context
+def cli(ctx, auto_server, server_mode, server_verbose):
+    # Store auto_server and server_mode in the context for use in ServerCheckGroup
+    ctx.obj = {
+        "auto_server": auto_server,
+        "server_mode": server_mode,
+        "server_verbose": server_verbose
+    }
     pass
 
 
@@ -239,6 +270,7 @@ add_category = click.option(
 @model_output_dir
 @nocleanup
 @verbose_logging
+@auto_start_server
 def transcribe(
     source: str,
     loc: str,
@@ -343,6 +375,7 @@ def get_queue():
 @add_speakers
 @add_category
 @add_loc
+@auto_start_server
 def preprocess(
     source: str,
     loc: str,
@@ -489,6 +522,7 @@ def postprocess(
 
 cli.add_command(commands.queue)
 cli.add_command(commands.curator)
+cli.add_command(commands.server)
 
 if __name__ == "__main__":
     cli()

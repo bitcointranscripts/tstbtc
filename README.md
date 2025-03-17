@@ -77,72 +77,84 @@ cp config.ini.example config.ini
 
 ## Installation and Setup
 
-Navigate to the application directory and run the below commands:
+```sh
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-1. `python3 -m venv venv` creates a virtual environment
-2. `source venv/bin/activate` activates the virtual environment
-3. `pip3 install .` to install the application
-   - To include Whisper support, use: `pip3 install .[whisper]`
-4. Create a `.env` file in the project root and add the required variables based on [Prerequisites](#prerequisites).
-5. `tstbtc --version` view the application version
-6. `tstbtc --help` view the application help
+# Install the application
+pip3 install .
+# With Whisper support
+pip3 install .[whisper]
+# In edit/dev mode
+pip3 install -e .
+
+# Create .env file with required variables
+# See Prerequisites section
+
+# Verify installation
+tstbtc --version
+tstbtc --help
+```
 
 To uninstall: `pip3 uninstall tstbtc`
 
 ## Usage
 
-The application has a server component that needs to be running for the CLI to function.
-This allows the heavy lifting of transcription to be done on a separate machine if desired.
+The application has a server component that handles the transcription processing. This allows the heavy lifting of transcription to be done on a separate machine if desired. The CLI can automatically start this server locally when needed, or you can manage it manually.
 
-### Starting the Server
+### Server Management
 
-To start the server, navigate to the application directory and run:
+**Automatic Mode** (default):
+- CLI starts server automatically when needed
+- Control with `--auto-server`, `--server-mode`, `--server-verbose` flags
+  ```
 
+**Manual Mode**:
 ```sh
-tstbtc-server prod
-```
+# Start server
+tstbtc server start
 
-The server will be accessible at `http://localhost:8000` by default.
-Ensure this matches the `TRANSCRIPTION_SERVER_URL` in your `.env` file.
+# Check status
+tstbtc server status
+
+# Stop server
+tstbtc server stop
+
+# View logs
+tstbtc server logs [--follow] [--lines 100]
+```
 
 ### Using the CLI
 
-Once the server is running, you can use the CLI commands.
+```sh
+# Basic usage
+tstbtc transcribe <source_file/url>
+```
 
-`tstbtc transcribe {source_file/url}` transcribe the given source
-
-Suported sources:
-
+**Supported Sources**:
 - YouTube videos and playlists
 - Local and remote audio files
 - JSON files containing individual sources
 
-Note:
+**Metadata Parameters**:
+- `--loc`: Location in bitcointranscripts hierarchy [default: "misc"]
+- `--title`: Title for transcript (required for audio files)
+- `--date`: Event date (yyyy-mm-dd)
+- `--tags`: Add tags (can use multiple times)
+- `--speakers`: Add speakers (can use multiple times)
+- `--category`: Add categories (can use multiple times)
 
-- The https links need to be wrapped in quotes when running the command on zsh
-
-To include optional metadata in your transcript, you can add the following
-parameters:
-
-- `--loc`: Add the location in the bitcointranscripts hierarchy that you want to associate the transcript [default: "misc"]
-- `-t` or `--title`: Add the title for the resulting transcript (required for audio files)
-- `-d` or `--date`: Add the event date to transcript's metadata in format 'yyyy-mm-dd'
-- can be used multiple times:
-  - `-T` or `--tags`: Add a tag to transcript's metadata
-  - `-s` or `--speakers`: Add a speaker to the transcript's metadata
-  - `-c` or `--category`: Add a category to the transcript's metadata
-
-To configure the transcription process, you can use the following flags:
-
-- `-m` or `--model`: Select which whisper model to use for the transcription [default: tiny.en]
-- `-D` or `--deepgram`: Use deepgram for transcription, instead of using the whisper model [default: False]
-- `-M` or `--diarize`: Supply this flag if you have multiple speakers AKA want to diarize the content [only available with deepgram]
-- `-S` or `--summarize`: Summarize the transcript [only available with deepgram]
-- `--github`: Specify the GitHub operation mode
-- `-u` or `--upload`: Upload processed model files to AWS S3
-- `--markdown`: Save the resulting transcript to a markdown format supported by bitcointranscripts
-- `--noqueue`: Do not push the resulting transcript to the Queuer, instead store the payload in a json file
-- `--nocleanup`: Do not remove temp files on exit
+**Transcription Options**:
+- `--model`: Select whisper model [default: tiny.en]
+- `--deepgram`: Use Deepgram instead of Whisper
+- `--diarize`: Enable speaker diarization (Deepgram only)
+- `--summarize`: Generate summary (Deepgram only)
+- `--github`: Push to GitHub
+- `--upload`: Upload to AWS S3
+- `--markdown`: Save as markdown
+- `--noqueue`: Skip pushing to Queuer
+- `--nocleanup`: Keep temporary files
 
 ### Examples
 

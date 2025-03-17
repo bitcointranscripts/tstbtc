@@ -6,7 +6,6 @@ from app import __version__
 from app.config import settings
 from app.logging import get_logger
 from app.transcript import Transcript
-from app.utils import write_to_json
 
 
 logger = get_logger()
