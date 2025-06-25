@@ -6,6 +6,7 @@ import click
 
 from app import __app_name__, __version__, commands, utils
 from app.api_client import APIClient
+from app.commands.summary import correct_command, summarize_command
 from app.commands.cli_utils import (
     get_transcription_url, 
     auto_start_server
@@ -118,6 +119,13 @@ summarize = click.option(
     default=settings.config.getboolean("summarize", False),
     show_default=True,
     help="Summarize the transcript [only available with deepgram]",
+)
+correct_transcript = click.option(
+    "--correct",
+    is_flag=True,
+    default=settings.config.getboolean("correct_transcript", False),
+    show_default=True,
+    help="Correct the transcript using AI models [works with any transcription method]",
 )
 cutoff_date = click.option(
     "--cutoff-date",
@@ -283,6 +291,7 @@ def transcribe(
     username: str,
     github: bool,
     deepgram: bool,
+    correct:bool,
     summarize: bool,
     diarize: bool,
     upload: bool,
@@ -320,6 +329,7 @@ def transcribe(
         "category": list(category),
         "username": username,
         "github": github,
+        "correct": correct,
         "deepgram": deepgram,
         "summarize": summarize,
         "diarize": diarize,
@@ -449,6 +459,7 @@ def postprocess(
     username: str,
     github: bool,
     upload: bool,
+    correct:bool,
     markdown: bool,
     text: bool,
     json: bool,
@@ -524,6 +535,8 @@ def postprocess(
 cli.add_command(commands.media)
 cli.add_command(commands.curator)
 cli.add_command(commands.server)
+cli.add_command(correct_command)
+cli.add_command(summarize_command)
 
 if __name__ == "__main__":
     cli()

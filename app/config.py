@@ -36,7 +36,14 @@ class Settings:
         overview += f"GITHUB_METADATA_REPO_NAME: {self.GITHUB_METADATA_REPO_NAME}\n"
         overview += f"TRANSCRIPTION_SERVER_URL: {self.TRANSCRIPTION_SERVER_URL}\n"
         overview += f"BTC_TRANSCRIPTS_URL: {self.BTC_TRANSCRIPTS_URL}\n"
-        
+        overview += f"GEMINI_API_KEY: {'[SET]' if self.GEMINI_API_KEY else '[NOT SET]'}\n"
+        overview += f"OPENAI_API_KEY: {'[SET]' if self.OPENAI_API_KEY else '[NOT SET]'}\n"
+        overview += f"ANTHROPIC_API_KEY: {'[SET]' if self.ANTHROPIC_API_KEY else '[NOT SET]'}\n"
+        overview += f"DEFAULT_SUMMARY_PROVIDER: {self.DEFAULT_SUMMARY_PROVIDER}\n"
+        overview += f"DEFAULT_GEMINI_MODEL: {self.DEFAULT_GEMINI_MODEL}\n"
+        overview += f"DEFAULT_OPENAI_MODEL: {self.DEFAULT_OPENAI_MODEL}\n"
+        overview += f"DEFAULT_CLAUDE_MODEL: {self.DEFAULT_CLAUDE_MODEL}\n"
+            
         # Add config.ini settings
         overview += "\nSettings from config.ini:\n"
         for key, value in self.config.items():
@@ -80,7 +87,36 @@ class Settings:
     def GITHUB_INSTALLATION_ID(self):
         return self._get_env_variable('GITHUB_INSTALLATION_ID',
             "To use GitHub App integration, you need to define a 'GITHUB_INSTALLATION_ID' in your .env file")
+    # Add these properties to the Settings class in app/config.py
 
+    @property
+    def GEMINI_API_KEY(self):
+        # First check environment, then config file
+        return os.getenv('GEMINI_API_KEY') or self.config.get('gemini_api_key', '')
+
+    @property
+    def OPENAI_API_KEY(self):
+        return os.getenv('OPENAI_API_KEY') or self.config.get('openai_api_key', '')
+
+    @property
+    def ANTHROPIC_API_KEY(self):
+        return os.getenv('ANTHROPIC_API_KEY') or self.config.get('anthropic_api_key', '')
+
+    @property
+    def DEFAULT_SUMMARY_PROVIDER(self):
+        return os.getenv('DEFAULT_SUMMARY_PROVIDER') or self.config.get('default_summary_provider', 'gemini')
+
+    @property
+    def DEFAULT_GEMINI_MODEL(self):
+        return os.getenv('DEFAULT_GEMINI_MODEL') or self.config.get('default_gemini_model', 'gemma-3-27b-it')
+
+    @property
+    def DEFAULT_OPENAI_MODEL(self):
+        return os.getenv('DEFAULT_OPENAI_MODEL') or self.config.get('default_openai_model', 'gpt-4o')
+
+    @property
+    def DEFAULT_CLAUDE_MODEL(self):
+        return os.getenv('DEFAULT_CLAUDE_MODEL') or self.config.get('default_claude_model', 'claude-3-7-sonnet-20250219')
 # Initialize the Settings class and expose an instance
 settings = Settings()
 
