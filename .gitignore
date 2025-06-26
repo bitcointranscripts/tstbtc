@@ -135,3 +135,4 @@ dmypy.json
 .username
 .idea
 *.json
+output/

@@ -1,22 +1,12 @@
 import os
 import click
 from ..services.summary import correct_transcript, summarize_transcript, configure_api
-from .cli_utils import get_config
+from ..config import settings
 
-# Add these at the end of app/commands/summary.py
-
-@click.command(name="correct")
-@click.option("--input", "-i", required=True, help="Path to input transcript file.")
-@click.option("--output", "-o", help="Path to save corrected transcript.")
-@click.option("--provider", default="gemini", type=click.Choice(["gemini", "openai", "claude"]), help="AI provider to use.")
-@click.option("--model", help="Model name to use with the selected provider.")
-@click.option("--api-key", help="Custom API key for the selected provider.")
-def correct_command(input, output, provider, model, api_key):
-    """Correct transcription errors in the transcript."""
-    config = get_config()
-    
+def do_correct(input, output, provider, model, api_key):
+    """Implementation logic for transcript correction"""
     if not api_key:
-        api_key = config.get(f"{provider}_api_key", None)
+        api_key = settings.config.get(f"{provider}_api_key", None)
     
     configure_api(provider=provider, api_key=api_key)
     
@@ -36,19 +26,10 @@ def correct_command(input, output, provider, model, api_key):
             f.write(corrected_text)
         click.echo(f"Corrected transcript saved to: {output}")
 
-@click.command(name="summarize")
-@click.option("--input", "-i", required=True, help="Path to input transcript file.")
-@click.option("--output", "-o", help="Path to save summary.")
-@click.option("--provider", default="gemini", type=click.Choice(["gemini", "openai", "claude"]), help="AI provider to use.")
-@click.option("--model", help="Model name to use with the selected provider.")
-@click.option("--api-key", help="Custom API key for the selected provider.")
-@click.option("--correct-first/--no-correct", default=False, help="Correct transcript before summarizing.")
-def summarize_command(input, output, provider, model, api_key, correct_first):
-    """Generate a summary of the transcript."""
-    config = get_config()
-    
+def do_summarize(input, output, provider, model, api_key, correct_first):
+    """Implementation logic for transcript summarization"""
     if not api_key:
-        api_key = config.get(f"{provider}_api_key", None)
+        api_key = settings.config.get(f"{provider}_api_key", None)
     
     configure_api(provider=provider, api_key=api_key)
     
@@ -73,3 +54,50 @@ def summarize_command(input, output, provider, model, api_key, correct_first):
         with open(output, 'w', encoding='utf-8') as f:
             f.write(summary_text)
         click.echo(f"Summary saved to: {output}")
+
+@click.group()
+def summary():
+    """Transcript correction and summarization commands."""
+    pass
+
+@summary.command()
+@click.option("--input", "-i", required=True, help="Path to input transcript file.")
+@click.option("--output", "-o", help="Path to save corrected transcript.")
+@click.option("--provider", default="gemini", type=click.Choice(["gemini", "openai", "claude"]), help="AI provider to use.")
+@click.option("--model", help="Model name to use with the selected provider.")
+@click.option("--api-key", help="Custom API key for the selected provider.")
+def correct(input, output, provider, model, api_key):
+    """Correct transcription errors in the transcript."""
+    do_correct(input, output, provider, model, api_key)
+
+@summary.command()
+@click.option("--input", "-i", required=True, help="Path to input transcript file.")
+@click.option("--output", "-o", help="Path to save summary.")
+@click.option("--provider", default="gemini", type=click.Choice(["gemini", "openai", "claude"]), help="AI provider to use.")
+@click.option("--model", help="Model name to use with the selected provider.")
+@click.option("--api-key", help="Custom API key for the selected provider.")
+@click.option("--correct-first/--no-correct", default=False, help="Correct transcript before summarizing.")
+def summarize(input, output, provider, model, api_key, correct_first):
+    """Generate a summary of the transcript."""
+    do_summarize(input, output, provider, model, api_key, correct_first)
+
+@click.command(name="correct")
+@click.option("--input", "-i", required=True, help="Path to input transcript file.")
+@click.option("--output", "-o", help="Path to save corrected transcript.")
+@click.option("--provider", default="gemini", type=click.Choice(["gemini", "openai", "claude"]), help="AI provider to use.")
+@click.option("--model", help="Model name to use with the selected provider.")
+@click.option("--api-key", help="Custom API key for the selected provider.")
+def correct_command(input, output, provider, model, api_key):
+    """Correct transcription errors in the transcript."""
+    do_correct(input, output, provider, model, api_key)
+
+@click.command(name="summarize")
+@click.option("--input", "-i", required=True, help="Path to input transcript file.")
+@click.option("--output", "-o", help="Path to save summary.")
+@click.option("--provider", default="gemini", type=click.Choice(["gemini", "openai", "claude"]), help="AI provider to use.")
+@click.option("--model", help="Model name to use with the selected provider.")
+@click.option("--api-key", help="Custom API key for the selected provider.")
+@click.option("--correct-first/--no-correct", default=False, help="Correct transcript before summarizing.")
+def summarize_command(input, output, provider, model, api_key, correct_first):
+    """Generate a summary of the transcript."""
+    do_summarize(input, output, provider, model, api_key, correct_first)

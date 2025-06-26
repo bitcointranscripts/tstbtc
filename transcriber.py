@@ -6,7 +6,7 @@ import click
 
 from app import __app_name__, __version__, commands, utils
 from app.api_client import APIClient
-from app.commands.summary import correct_command, summarize_command
+from app.commands.summary import summary, correct_command, summarize_command
 from app.commands.cli_utils import (
     get_transcription_url, 
     auto_start_server
@@ -535,6 +535,7 @@ def postprocess(
 cli.add_command(commands.media)
 cli.add_command(commands.curator)
 cli.add_command(commands.server)
+cli.add_command(summary)
 cli.add_command(correct_command)
 cli.add_command(summarize_command)
 
