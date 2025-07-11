@@ -14,6 +14,7 @@ from app.data_writer import DataWriter
 from app.data_fetcher import DataFetcher
 from app.github_api_handler import GitHubAPIHandler
 from app.exporters import ExporterFactory, TranscriptExporter
+from app.services.llm_service import LLMFactory
 
 
 class Transcription:
@@ -36,6 +37,11 @@ class Transcription:
         batch_preprocessing_output=False,
         needs_review=False,
         include_metadata=True,
+        correct=False,
+        summarize_llm=False,
+        llm_provider="openai",
+        llm_correction_model="gpt-4o-mini",
+        llm_summary_model="gpt-4o",
     ):
         self.nocleanup = nocleanup
         self.status = "idle"  # Can be "idle", "in_progress", or "completed"
@@ -87,6 +93,17 @@ class Transcription:
         self.existing_media = None
         self.preprocessing_output = [] if batch_preprocessing_output else None
         self.data_fetcher = DataFetcher(settings.BTC_TRANSCRIPTS_URL)
+
+        self.correct = correct
+        self.summarize_llm = summarize_llm
+        self.llm_provider = llm_provider
+        self.llm_correction_model = llm_correction_model
+        self.llm_summary_model = llm_summary_model
+        
+        if self.correct or self.summarize_llm:
+            self.llm_service = LLMFactory.create_llm_service(self.llm_provider)
+        else:
+            self.llm_service = None
 
         self.logger.debug(f"Temp directory: {self.tmp_dir}")
 
@@ -485,6 +502,22 @@ class Transcription:
         with the existing code.
         """
         try:
+            # --- NEW LLM REFINEMENT STEP ---
+            if self.llm_service:
+                if self.correct and transcript.outputs["raw"]:
+                    self.logger.info(f"Correcting transcript with {self.llm_provider}...")
+                    corrected_text = self.llm_service.correct_transcript(
+                        transcript.outputs["raw"], self.llm_correction_model
+                    )
+                    transcript.outputs["raw"] = corrected_text # Overwrite with corrected version
+                
+                if self.summarize_llm and transcript.outputs["raw"]:
+                    self.logger.info(f"Summarizing transcript with {self.llm_provider}...")
+                    summary = self.llm_service.summarize_text(
+                        transcript.outputs["raw"], self.llm_summary_model
+                    )
+                    transcript.summary = summary # Overwrite summary
+
             # Handle markdown output
             if self.markdown or self.github_handler:
                 transcript.outputs["markdown"] = self.write_to_markdown_file(

@@ -210,6 +210,25 @@ verbose_logging = click.option(
     help="Supply this flag to enable verbose logging",
 )
 
+correct_transcript = click.option(
+    "--correct",
+    is_flag=True,
+    default=False,
+    help="Correct the transcript using the configured LLM provider.",
+)
+summarize_llm = click.option(
+    "--summarize-llm",
+    is_flag=True,
+    default=False,
+    help="Generate a new summary using the configured LLM provider.",
+)
+llm_provider = click.option(
+    "--llm-provider",
+    type=click.Choice(["openai", "google", "claude"]),
+    default=settings.config.get("llm_provider", "openai"),
+    help="LLM provider for correction and summarization.",
+)
+
 add_loc = click.option(
     "--loc",
     default="misc",
@@ -279,6 +298,9 @@ add_category = click.option(
 @nocleanup
 @verbose_logging
 @auto_start_server
+@correct_transcript
+@summarize_llm
+@llm_provider
 def transcribe(
     source: str,
     loc: str,
@@ -303,7 +325,9 @@ def transcribe(
     no_metadata: bool,
     needs_review: bool,
     cutoff_date: str,
-    nocheck: bool,
+    correct: bool,
+    summarize_llm: bool,
+    llm_provider: str,
 ) -> None:
     """Transcribe the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -342,7 +366,9 @@ def transcribe(
         "include_metadata": not no_metadata,
         "needs_review": needs_review,
         "cutoff_date": cutoff_date,
-        "nocheck": nocheck,
+        "correct": correct,
+        "summarize_llm": summarize_llm,
+        "llm_provider": llm_provider,
     }
     try:
         queue_response = api_client.add_to_queue(data, source)

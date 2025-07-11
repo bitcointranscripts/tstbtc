@@ -11,3 +11,8 @@ one_sentence_per_line = True
 verbose_logging = True
 server_mode = dev
 server_verbose = True
+
+[llm]
+llm_provider = openai
+llm_correction_model = gpt-4o
+llm_summary_model = gpt-3.5
