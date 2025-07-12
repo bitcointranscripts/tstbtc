@@ -502,35 +502,65 @@ class Transcription:
         with the existing code.
         """
         try:
-            # --- NEW LLM REFINEMENT STEP ---
-            if self.llm_service:
-                if self.correct and transcript.outputs["raw"]:
-                    self.logger.info(f"Correcting transcript with {self.llm_provider}...")
-                    corrected_text = self.llm_service.correct_transcript(
-                        transcript.outputs["raw"], self.llm_correction_model
-                    )
-                    transcript.outputs["raw"] = corrected_text # Overwrite with corrected version
-                
-                if self.summarize_llm and transcript.outputs["raw"]:
-                    self.logger.info(f"Summarizing transcript with {self.llm_provider}...")
-                    summary = self.llm_service.summarize_text(
-                        transcript.outputs["raw"], self.llm_summary_model
-                    )
-                    transcript.summary = summary # Overwrite summary
+            text_exporter = self.exporters.get("text")
 
-            # Handle markdown output
+            # --- Step 1: Save the original raw transcript if it exists ---
+            if transcript.outputs["raw"] and text_exporter:
+                raw_output_dir = text_exporter.get_output_path(transcript)
+                raw_file_path = text_exporter.construct_file_path(
+                    directory=raw_output_dir,
+                    filename=f"{transcript.title}_raw",
+                    file_type="txt",
+                    include_timestamp=False
+                )
+                text_exporter.write_to_file(transcript.outputs["raw"], raw_file_path)
+                self.logger.info(f"Raw transcript saved to: {raw_file_path}")
+
+            # --- Step 2: Perform LLM Correction ---
+            if self.llm_service and self.correct and transcript.outputs["raw"]:
+                self.logger.info(f"Correcting transcript with {self.llm_provider}...")
+                corrected_transcript_text = self.llm_service.correct_transcript(
+                    transcript.outputs["raw"], self.llm_correction_model
+                )
+                
+                if text_exporter:
+                    corrected_output_dir = text_exporter.get_output_path(transcript)
+                    corrected_file_path = text_exporter.construct_file_path(
+                        directory=corrected_output_dir,
+                        filename=f"{transcript.title}_corrected",
+                        file_type="txt",
+                        include_timestamp=False
+                    )
+                    text_exporter.write_to_file(corrected_transcript_text, corrected_file_path)
+                    self.logger.info(f"Corrected transcript saved to: {corrected_file_path}")
+
+                # Overwrite the main "raw" output so subsequent steps use the corrected version
+                transcript.outputs["raw"] = corrected_transcript_text
+
+            # --- Step 3: Perform LLM Summarization ---
+            if self.llm_service and self.summarize_llm and transcript.outputs["raw"]:
+                self.logger.info(f"Summarizing transcript with {self.llm_provider}...")
+                summary_text = self.llm_service.summarize_text(
+                    transcript.outputs["raw"], self.llm_summary_model
+                )
+                transcript.summary = summary_text
+
+                if text_exporter:
+                    summary_output_dir = text_exporter.get_output_path(transcript)
+                    summary_file_path = text_exporter.construct_file_path(
+                        directory=summary_output_dir,
+                        filename=f"{transcript.title}_summary",
+                        file_type="txt",
+                        include_timestamp=False
+                    )
+                    text_exporter.write_to_file(summary_text, summary_file_path)
+                    self.logger.info(f"Summary saved to: {summary_file_path}")
+
+            # --- Step 4: Run existing exporters for final outputs (Markdown, JSON, etc.) ---
             if self.markdown or self.github_handler:
                 transcript.outputs["markdown"] = self.write_to_markdown_file(
                     transcript,
                 )
-
-            if "text" in self.exporters:
-                try:
-                    transcript.outputs["text"] = self.exporters["text"].export(
-                        transcript, add_timestamp=False
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Text exporter failed: {e}")
 
             if "json" in self.exporters:
                 transcript.outputs["json"] = self.exporters["json"].export(
