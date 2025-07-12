@@ -9,3 +9,5 @@ one_sentence_per_line = True
 
 [development]
 verbose_logging = True
+server_mode = dev
+server_verbose = True
