@@ -346,7 +346,10 @@ class Video(Source):
                 video_file_path = media_processor.download_youtube_video(
                     youtube_url=self.source_file,
                     output_dir=working_dir,
-                    format_selector='worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst',
+                    # Attempt to get the worst quality mp4 video and the best quality m4a audio, and combine them.
+                    # If that's not possible, it will try to get the worst quality video and the best quality audio of any format and combine them.
+                    # If that also fails, it will just grab the worst quality version of the video it can find, in any format.
+                    format_selector='worstvideo[ext=mp4]+bestaudio[ext=m4a]/worstvideo+bestaudio/worst',
                     filename_template='videoFile.%(ext)s'
                 )
             else:
