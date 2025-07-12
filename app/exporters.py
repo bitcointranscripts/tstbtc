@@ -363,24 +363,25 @@ class ExporterFactory:
             A dictionary of exporters with their type as the key
         """
         exporters = {}
+        output_dir = config.get("model_output_dir", "local_models/")
 
         # Create markdown exporter if needed
         if config.get("markdown", False):
             exporters["markdown"] = MarkdownExporter(
-                output_dir=config.get("model_output_dir", "local_models/"),
+                output_dir=output_dir,
                 transcript_by=transcript_by,
             )
 
         # Create text exporter if needed
         if config.get("text_output", False):
             exporters["text"] = TextExporter(
-                output_dir=config.get("model_output_dir", "local_models/")
+                output_dir=output_dir
             )
 
         # Create JSON exporter if needed
         if config.get("json", True):
             exporters["json"] = JsonExporter(
-                output_dir=config.get("model_output_dir", "local_models/"),
+                output_dir=output_dir,
                 transcript_by=transcript_by,
             )
 

@@ -339,39 +339,19 @@ class Video(Source):
 
     def process(self, working_dir):
         """Process video"""
-
-        def download_video():
-            """Helper method to download a YouTube video and return its absolute path"""
-            # sanity checks
-            if self.local:
-                raise Exception(f"{self.source_file} is a local file")
-            try:
-                self.logger.debug(f"Downloading video: {self.source_file}")
-                ydl_opts = {
-                    "format": 'worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst',
-                    "outtmpl": os.path.join(working_dir, "videoFile.%(ext)s"),
-                    "nopart": True,
-                }
-                with yt_dlp.YoutubeDL(ydl_opts) as ytdl:
-                    ytdl.download([self.source_file])
-
-                output_file = os.path.join(working_dir, "videoFile.mp4")
-                if not os.path.exists(output_file):
-                    raise Exception(f"Downloaded file not found: {output_file}")
-
-                return os.path.abspath(output_file)
-            except Exception as e:
-                self.logger.error(e)
-                raise Exception(f"Error downloading video: {e}")
-
         try:
             self.logger.debug(f"Video processing: '{self.source_file}'")
+            media_processor = MediaProcessor()
             if not self.local:
-                video_file_path = download_video()
+                video_file_path = media_processor.download_youtube_video(
+                    youtube_url=self.source_file,
+                    output_dir=working_dir,
+                    format_selector='worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst',
+                    filename_template='videoFile.%(ext)s'
+                )
             else:
                 video_file_path = os.path.abspath(self.source_file)
 
-            media_processor = MediaProcessor()
             audio_file = media_processor.convert_to_mp3(
                 video_file_path, working_dir)
             return audio_file

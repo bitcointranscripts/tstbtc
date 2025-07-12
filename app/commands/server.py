@@ -1,6 +1,7 @@
 import os
 import click
 
+from app.config import settings
 from app.commands.cli_utils import (
     start_server,
     stop_server,
@@ -18,7 +19,7 @@ def server():
 @click.option(
     "--mode",
     type=click.Choice(["dev", "prod"]),
-    default="prod",
+    default=settings.config.get("server_mode", "prod"),
     help="Server mode to start",
     show_default=True,
 )
@@ -48,7 +49,7 @@ def start(mode, host, port, verbose):
 @click.option(
     "--mode",
     type=click.Choice(["dev", "prod"]),
-    default="prod",
+    default=settings.config.get("server_mode", "prod"),
     help="Server mode to stop",
     show_default=True,
 )
@@ -60,7 +61,7 @@ def stop(mode):
 @click.option(
     "--mode",
     type=click.Choice(["dev", "prod"]),
-    default="prod",
+    default=settings.config.get("server_mode", "prod"),
     help="Server mode to check",
     show_default=True,
 )
@@ -92,7 +93,7 @@ def status(mode):
 @click.option(
     "--mode",
     type=click.Choice(["dev", "prod"]),
-    default="prod",
+    default=settings.config.get("server_mode", "prod"),
     help="Server mode to check logs",
     show_default=True,
 )

@@ -155,3 +155,43 @@ class MediaProcessor:
         if not video_url:
             video_url = self.get_yt_dlp_url(youtube_url)
         return video_url
+
+    def get_youtube_video_info(self, youtube_url):
+        """Extracts video metadata using yt_dlp."""
+        ydl_opts = {'quiet': True, 'no_warnings': True}
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(youtube_url, download=False)
+        except Exception as e:
+            logger.error(f"Error extracting video info: {e}")
+            raise
+
+    def download_youtube_video(self, youtube_url, output_dir=None, format_selector='best', filename_template='%(title)s.%(ext)s'):
+        """
+        Downloads a YouTube video using yt_dlp.
+        For more information on format selection, see:
+        https://github.com/yt-dlp/yt-dlp#format-selection-examples
+        """
+        if output_dir is None:
+            output_dir = os.getcwd()
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        ydl_opts = {
+            'format': format_selector,
+            'outtmpl': os.path.join(output_dir, filename_template),
+            'nopart': True,
+        }
+
+        try:
+            logger.debug(f"Downloading video: {youtube_url}")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(youtube_url, download=True)
+                filename = ydl.prepare_filename(info_dict)
+                logger.info(f"Successfully downloaded {youtube_url} to {filename}")
+                return filename
+        except Exception as e:
+            error_message = f"Error downloading youtube video ({format_selector}): {e}"
+            logger.error(error_message)
+            raise Exception(error_message)
