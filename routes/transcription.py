@@ -113,7 +113,6 @@ async def add_to_queue(
     source: Optional[str] = Form(None),
     source_file: Optional[UploadFile] = File(None),
     correct: bool = Form(False),
-    summarize_llm: bool = Form(False),
     llm_provider: str = Form("openai"),
 ):
     temp_file_path = None
@@ -134,7 +133,6 @@ async def add_to_queue(
             text_output=text,
             needs_review=needs_review,
             correct=correct,
-            summarize_llm=summarize_llm,
             llm_provider=llm_provider,
         )
         if source_file:
