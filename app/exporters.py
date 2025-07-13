@@ -198,7 +198,7 @@ class MarkdownExporter(TranscriptExporter):
 
         Args:
             transcript: The transcript to export
-            **kwargs: Additional parameters like review_flag
+            **kwargs: Additional parameters like review_flag and content_key
 
         Returns:
             The complete Markdown content with metadata
@@ -214,6 +214,13 @@ class MarkdownExporter(TranscriptExporter):
 
         # Get metadata from the source
         metadata = transcript.source.to_json()
+
+        # Determine which content to use
+        content_key = kwargs.get("content_key", "corrected_text")
+        content = transcript.outputs.get(content_key, transcript.outputs.get("raw"))
+
+        if content is None:
+            raise Exception(f"No transcript content found for key '{content_key}' or 'raw'")
 
         # Add or modify specific fields
         if self.transcript_by:
@@ -312,6 +319,8 @@ class TextExporter(TranscriptExporter):
         Args:
             transcript: The transcript to export
             add_timestamp: Whether to add a timestamp to the filename (default: False)
+            content_key: The key in transcript.outputs to use for the content (default: "raw")
+            suffix: A suffix to add to the filename (e.g., "_raw")
             **kwargs: Additional parameters (unused)
 
         Returns:
@@ -319,11 +328,17 @@ class TextExporter(TranscriptExporter):
         """
         self.logger.debug("Exporting transcript to plain text...")
 
-        if transcript.outputs["raw"] is None:
-            raise Exception("No transcript content found")
+        content_key = kwargs.get("content_key", "raw")
+        content = transcript.outputs.get(content_key)
+        if content is None and content_key == "summary":
+            content = transcript.summary
+
+        if content is None:
+            raise Exception(f"No content found for key: {content_key}")
 
         # Get parameters
         add_timestamp = kwargs.get("add_timestamp", False)
+        suffix = kwargs.get("suffix", "")
 
         # Get output directory
         output_dir = self.get_output_path(transcript)
@@ -331,13 +346,13 @@ class TextExporter(TranscriptExporter):
         # Construct file path
         file_path = self.construct_file_path(
             directory=output_dir,
-            filename=transcript.title,
+            filename=f"{transcript.title}{suffix}",
             file_type="txt",
             include_timestamp=add_timestamp,
         )
 
         # Write to file
-        result_path = self.write_to_file(transcript.outputs["raw"], file_path)
+        result_path = self.write_to_file(content, file_path)
 
         self.logger.info(f"(exporter) Text file written to: {result_path}")
         return result_path

@@ -134,3 +134,7 @@ dmypy.json
 .pyre/
 .username
 .idea
+output/
+test_feats/
+logs/
+metadata/
