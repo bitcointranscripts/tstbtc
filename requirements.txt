@@ -21,3 +21,4 @@ fastapi==0.111.0
 PyJWT==2.9.0
 cryptography==43.0.1
 psutil==7.0.0
+openai==1.98.0
