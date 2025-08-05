@@ -60,7 +60,7 @@ class TestTextExporter:
             text_exporter.export(mock_transcript)
 
         # Check the error message
-        assert "No transcript content found" in str(excinfo.value)
+        assert "No content found for key: raw" in str(excinfo.value)
 
     def test_output_directory_creation(self, temp_dir, mock_transcript):
         """Test that the exporter creates output directories as needed"""
