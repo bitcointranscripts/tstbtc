@@ -72,6 +72,10 @@ class Transcript:
     def summary(self):
         return self.source.summary
 
+    @summary.setter
+    def summary(self, value):
+        self.source.summary = value
+
     def __str__(self):
         excluded_fields = ['test_mode', 'logger']
         fields = {key: value for key, value in self.__dict__.items()

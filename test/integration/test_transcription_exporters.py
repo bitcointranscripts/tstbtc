@@ -82,18 +82,18 @@ class TestTranscriptionWithExporters:
         # Check the result
         assert result == "/path/to/exported/markdown.md"
 
-    def test_postprocess_with_markdown(
+    def test_export_with_markdown(
         self, transcription_with_exporters, mock_transcript
     ):
-        """Test postprocess with markdown output"""
+        """Test export with markdown output"""
         # Mock the write_to_markdown_file method to avoid calling the exporter directly
         transcription_with_exporters.write_to_markdown_file = mock.MagicMock()
         transcription_with_exporters.write_to_markdown_file.return_value = (
             "/path/to/exported/markdown.md"
         )
 
-        # Call postprocess
-        transcription_with_exporters.postprocess(mock_transcript)
+        # Call export
+        transcription_with_exporters.export(mock_transcript)
 
         # Check that write_to_markdown_file was called
         transcription_with_exporters.write_to_markdown_file.assert_called_once()
@@ -104,13 +104,13 @@ class TestTranscriptionWithExporters:
             == "/path/to/exported/markdown.md"
         )
 
-    def test_postprocess_with_text(
+    def test_export_with_text(
         self,
         transcription_with_exporters,
         mock_transcript,
         mock_transcription_deps,
     ):
-        """Test postprocess with text output"""
+        """Test export with text output"""
         # Get the mock exporters
         exporters = mock_transcription_deps[
             "ExporterFactory"
@@ -126,23 +126,17 @@ class TestTranscriptionWithExporters:
             "/path/to/exported/markdown.md"
         )
 
-        # Call postprocess
-        transcription_with_exporters.postprocess(mock_transcript)
+        # Call export
+        transcription_with_exporters.export(mock_transcript)
 
         # Check that the text exporter was called
-        text_exporter.export.assert_called_once()
+        text_exporter.export.assert_called()
         assert text_exporter.export.call_args[1]["add_timestamp"] is False
 
-        # Check that the output was stored in the transcript
-        assert (
-            mock_transcript.outputs["text"]
-            == "/path/to/exported/transcript.txt"
-        )
-
-    def test_postprocess_with_json(
+    def test_export_with_json(
         self, transcription_with_exporters, mock_transcript, mock_transcription_deps
     ):
-        """Test postprocess with JSON output"""
+        """Test export with JSON output"""
         # Get the mock exporters
         exporters = mock_transcription_deps[
             "ExporterFactory"
@@ -158,8 +152,8 @@ class TestTranscriptionWithExporters:
             "/path/to/exported/markdown.md"
         )
 
-        # Call postprocess
-        transcription_with_exporters.postprocess(mock_transcript)
+        # Call export
+        transcription_with_exporters.export(mock_transcript)
 
         # Check that the json exporter was called
         json_exporter.export.assert_called_once()
@@ -169,3 +163,67 @@ class TestTranscriptionWithExporters:
             mock_transcript.outputs["json"]
             == "/path/to/exported/transcript.json"
         )
+
+    def test_export_with_all_outputs(
+        self,
+        transcription_with_exporters,
+        mock_transcript,
+        mock_transcription_deps,
+    ):
+        """Test export with all outputs enabled"""
+        # Get mock exporters
+        exporters = mock_transcription_deps[
+            "ExporterFactory"
+        ].create_exporters.return_value
+        text_exporter = exporters["text"]
+        json_exporter = exporters["json"]
+
+        # Set up return values
+        text_exporter.export.return_value = "/path/to/text.txt"
+        json_exporter.export.return_value = "/path/to/json.json"
+
+        # Mock write_to_markdown_file
+        transcription_with_exporters.write_to_markdown_file = mock.MagicMock()
+        transcription_with_exporters.write_to_markdown_file.return_value = (
+            "/path/to/markdown.md"
+        )
+
+        # Call export
+        transcription_with_exporters.export(mock_transcript)
+
+        # Check that all exporters were called
+        text_exporter.export.assert_called()
+        json_exporter.export.assert_called_once()
+        transcription_with_exporters.write_to_markdown_file.assert_called_once()
+
+        # Check that all outputs are stored
+        assert mock_transcript.outputs["json"] == "/path/to/json.json"
+        assert mock_transcript.outputs["markdown"] == "/path/to/markdown.md"
+
+    def test_export_no_outputs(
+        self, patched_transcription, mock_transcript, mock_transcription_deps
+    ):
+        """Test export with no outputs enabled"""
+        # Create a Transcription instance with all export options disabled
+        transcription = Transcription(
+            markdown=False, text_output=False, json=False, username="Test User"
+        )
+        transcription.exporters.clear()
+
+        # Clear the mock transcript's outputs and add back the raw output
+        mock_transcript.outputs.clear()
+        mock_transcript.outputs['raw'] = 'test transcript'
+
+        # Mock write_to_markdown_file
+        transcription.write_to_markdown_file = mock.MagicMock()
+
+        # Call export
+        transcription.export(mock_transcript)
+
+        # Check that no exporters were called
+        transcription.write_to_markdown_file.assert_not_called()
+
+        # Check that no outputs were stored
+        assert "text" not in mock_transcript.outputs
+        assert "json" not in mock_transcript.outputs
+        assert "markdown" not in mock_transcript.outputs

@@ -93,13 +93,17 @@ class GitHubAPIHandler:
         response = self._make_request('POST', url, json=data)
         return response.json()
 
-    def create_or_update_file(self, repo_type, file_path, content, commit_message, branch):
+    def create_or_update_file(self, repo_type, file_path, content, commit_message, branch, get_sha=False):
         url = f"https://api.github.com/repos/{self.repos[repo_type]['owner']}/{self.repos[repo_type]['name']}/contents/{quote(file_path)}"
         data = {
             "message": commit_message,
             "content": base64.b64encode(content.encode()).decode(),
             "branch": branch
         }
+        if get_sha:
+            response = self._make_request('GET', url + f'?ref={branch}')
+            data['sha'] = response.json()['sha']
+
         response = self._make_request('PUT', url, json=data)
         return response.json()
 
@@ -114,23 +118,34 @@ class GitHubAPIHandler:
         response = self._make_request('POST', url, json=data)
         return response.json()
 
-    def push_transcripts(self, transcripts: list[Transcript]) -> str | None:
+    def push_transcripts(self, transcripts: list[Transcript], markdown_exporter) -> str | None:
         try:
             default_branch = self.get_default_branch('transcripts')
             branch_sha = self.get_branch_sha('transcripts', default_branch)
-            branch_name = f"transcripts-{''.join(random.choices('0123456789', k=6))}"
+            branch_name = f"transcripts-{'' .join(random.choices('0123456789', k=6))}"
             self.create_branch('transcripts', branch_name, branch_sha)
 
             for transcript in transcripts:
-                if transcript.outputs and transcript.outputs['markdown']:
-                    with open(transcript.outputs['markdown'], 'r') as file:
-                        content = file.read()
+                # First commit: Raw transcript
+                raw_content = markdown_exporter._create_with_metadata(transcript, content_key='raw')
+                self.create_or_update_file(
+                    'transcripts',
+                    transcript.output_path_with_title + ".md",
+                    raw_content,
+                    f'ai(transcript): "{transcript.title}" (raw)',
+                    branch_name
+                )
+
+                # Second commit: Corrected transcript
+                if transcript.outputs.get('corrected_text'):
+                    corrected_content = markdown_exporter._create_with_metadata(transcript, content_key='corrected_text')
                     self.create_or_update_file(
                         'transcripts',
-                        transcript.output_path_with_title,
-                        content,
-                        f'ai(transcript): "{transcript.title}" ({transcript.source.loc})',
-                        branch_name
+                        transcript.output_path_with_title + ".md",
+                        corrected_content,
+                        f'ai(transcript): "{transcript.title}" (corrected)',
+                        branch_name,
+                        get_sha=True # We need the SHA of the file to update it
                     )
 
             pr = self.create_pull_request(
