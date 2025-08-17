@@ -16,6 +16,7 @@ from app.github_api_handler import GitHubAPIHandler
 from app.exporters import ExporterFactory, TranscriptExporter
 from app.services.correction import CorrectionService
 from app.services.summarizer import SummarizerService
+from app.services.global_tag_manager import GlobalTagManager
 
 
 class Transcription:
@@ -58,6 +59,9 @@ class Transcription:
         self.metadata_writer = DataWriter(
             self.__configure_tstbtc_metadata_dir()
         )
+        
+        # Initialize global tag manager
+        self.tag_manager = GlobalTagManager(self.__configure_tstbtc_metadata_dir())
 
         self.exporters: dict[
             str, TranscriptExporter
@@ -212,13 +216,20 @@ class Transcription:
                 # Keep preprocessing outputs for later use
                 self.preprocessing_output.append(source.to_json())
         # Initialize new transcript from source
-        self.transcripts.append(
-            Transcript(
-                source=source,
-                test_mode=self.test_mode,
-                metadata_file=metadata_file,
-            )
+        transcript = Transcript(
+            source=source,
+            test_mode=self.test_mode,
+            metadata_file=metadata_file,
         )
+        
+        # Update global tag dictionary with new transcript metadata
+        try:
+            self.tag_manager.update_from_transcript(transcript)
+            self.logger.debug(f"Updated global tag dictionary with transcript: {source.title}")
+        except Exception as e:
+            self.logger.warning(f"Failed to update global tag dictionary: {e}")
+        
+        self.transcripts.append(transcript)
 
     def add_transcription_source(
         self,
