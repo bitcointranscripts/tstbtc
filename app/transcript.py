@@ -72,6 +72,10 @@ class Transcript:
     def summary(self):
         return self.source.summary
 
+    @summary.setter
+    def summary(self, value):
+        self.source.summary = value
+
     def __str__(self):
         excluded_fields = ['test_mode', 'logger']
         fields = {key: value for key, value in self.__dict__.items()
@@ -339,6 +343,33 @@ class Video(Source):
 
     def process(self, working_dir):
         """Process video"""
+
+        def download_video():
+            """Helper method to download a YouTube video and return its absolute path"""
+            # sanity checks
+            if self.local:
+                raise Exception(f"{self.source_file} is a local file")
+            try:
+                self.logger.debug(f"Downloading video: {self.source_file}")
+                ydl_opts = {
+                    "format": 'worstvideo+worstaudio/worst',
+                    "outtmpl": os.path.join(working_dir, "videoFile.%(ext)s"),
+                    "nopart": True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ytdl:
+                    ytdl.download([self.source_file])
+
+                for ext in ["mp4", "mkv", "webm"]:
+                    output_file = os.path.join(working_dir, f"videoFile.{ext}")
+                    if os.path.exists(output_file):
+                        return os.path.abspath(output_file)
+                raise Exception("Downloaded file not found in expected formats.")
+
+                return os.path.abspath(output_file)
+            except Exception as e:
+                self.logger.error(e)
+                raise Exception(f"Error downloading video: {e}")
+
         try:
             self.logger.debug(f"Video processing: '{self.source_file}'")
             media_processor = MediaProcessor()

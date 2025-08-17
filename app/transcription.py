@@ -14,6 +14,9 @@ from app.data_writer import DataWriter
 from app.data_fetcher import DataFetcher
 from app.github_api_handler import GitHubAPIHandler
 from app.exporters import ExporterFactory, TranscriptExporter
+from app.services.correction import CorrectionService
+from app.services.summarizer import SummarizerService
+from app.services.global_tag_manager import GlobalTagManager
 
 
 class Transcription:
@@ -36,9 +39,13 @@ class Transcription:
         batch_preprocessing_output=False,
         needs_review=False,
         include_metadata=True,
+        correct=False,
+        llm_provider="openai",
+        llm_correction_model="gpt-4o",
+        llm_summary_model="gpt-4o",
     ):
         self.nocleanup = nocleanup
-        self.status = "idle"  # Can be "idle", "in_progress", or "completed"
+        self.status = "idle"
         self.test_mode = test_mode
         self.logger = get_logger()
         self.tmp_dir = (
@@ -46,25 +53,26 @@ class Transcription:
         )
 
         self.transcript_by = self.__configure_username(username)
-        # during testing we need to create the markdown for validation purposes
         self.markdown = markdown or test_mode
         self.include_metadata = include_metadata
 
         self.metadata_writer = DataWriter(
             self.__configure_tstbtc_metadata_dir()
         )
+        
+        # Initialize global tag manager
+        self.tag_manager = GlobalTagManager(self.__configure_tstbtc_metadata_dir())
 
-        # Create exporters for transcript output formats
-        export_config = {
-            "markdown": self.markdown,
-            "text_output": text_output,
-            "json": json,
-            "model_output_dir": model_output_dir,
-        }
         self.exporters: dict[
             str, TranscriptExporter
         ] = ExporterFactory.create_exporters(
-            config=export_config, transcript_by=self.transcript_by
+            config={
+                "markdown": self.markdown,
+                "text_output": text_output,
+                "json": json,
+                "model_output_dir": model_output_dir,
+            },
+            transcript_by=self.transcript_by,
         )
 
         self.model_output_dir = model_output_dir
@@ -74,8 +82,12 @@ class Transcription:
             self.github_handler = GitHubAPIHandler()
         self.review_flag = self.__configure_review_flag(needs_review)
 
-        # @TODO: use ExporterFactory instead of `metadata_writer` for
-        #        services metadata output
+        self.processing_services = []
+        if correct:
+            self.processing_services.append(CorrectionService(provider=llm_provider, model=llm_correction_model))
+        if summarize:
+            self.processing_services.append(SummarizerService(provider=llm_provider, model=llm_summary_model))
+
         if deepgram:
             self.service = services.Deepgram(
                 summarize, diarize, upload, self.metadata_writer
@@ -86,7 +98,7 @@ class Transcription:
         self.transcripts: list[Transcript] = []
         self.existing_media = None
         self.preprocessing_output = [] if batch_preprocessing_output else None
-        self.data_fetcher = DataFetcher(settings.BTC_TRANSCRIPTS_URL)
+        self.data_fetcher = DataFetcher(base_url="http://btctranscripts.com")
 
         self.logger.debug(f"Temp directory: {self.tmp_dir}")
 
@@ -204,13 +216,20 @@ class Transcription:
                 # Keep preprocessing outputs for later use
                 self.preprocessing_output.append(source.to_json())
         # Initialize new transcript from source
-        self.transcripts.append(
-            Transcript(
-                source=source,
-                test_mode=self.test_mode,
-                metadata_file=metadata_file,
-            )
+        transcript = Transcript(
+            source=source,
+            test_mode=self.test_mode,
+            metadata_file=metadata_file,
         )
+        
+        # Update global tag dictionary with new transcript metadata
+        try:
+            self.tag_manager.update_from_transcript(transcript)
+            self.logger.debug(f"Updated global tag dictionary with transcript: {source.title}")
+        except Exception as e:
+            self.logger.warning(f"Failed to update global tag dictionary: {e}")
+        
+        self.transcripts.append(transcript)
 
     def add_transcription_source(
         self,
@@ -418,6 +437,7 @@ class Transcription:
                     self.service.transcribe(transcript)
                 transcript.status = "completed"
                 self.postprocess(transcript)
+                self.export(transcript)
 
             self.status = "completed"
             if self.github:
@@ -431,7 +451,12 @@ class Transcription:
         if not self.github_handler:
             return
 
-        pr_url_transcripts = self.github_handler.push_transcripts(transcripts)
+        markdown_exporter = self.exporters.get("markdown")
+        if not markdown_exporter:
+            self.logger.error("Markdown exporter not configured, cannot push to GitHub.")
+            return
+
+        pr_url_transcripts = self.github_handler.push_transcripts(transcripts, markdown_exporter)
         if pr_url_transcripts:
             self.logger.info(
                 f"transcripts: Pull request created: {pr_url_transcripts}"
@@ -479,33 +504,30 @@ class Transcription:
             raise Exception(f"Error writing to markdown file: {e}")
 
     def postprocess(self, transcript: Transcript) -> None:
-        """
-        Process the transcript to produce output files in the configured formats.
-        This updated method uses exporters when available, but maintains compatibility
-        with the existing code.
-        """
-        try:
-            # Handle markdown output
-            if self.markdown or self.github_handler:
-                transcript.outputs["markdown"] = self.write_to_markdown_file(
-                    transcript,
-                )
+        for service in self.processing_services:
+            service.process(transcript)
 
-            if "text" in self.exporters:
-                try:
-                    transcript.outputs["text"] = self.exporters["text"].export(
-                        transcript, add_timestamp=False
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Text exporter failed: {e}")
+    def export(self, transcript: Transcript):
+        """Exports the transcript to the configured formats."""
+        text_exporter = self.exporters.get("text")
+        if text_exporter:
+            # Save raw, corrected, and summary files
+            if transcript.outputs.get("raw"):
+                text_exporter.export(transcript, add_timestamp=False, content_key="raw", suffix="_raw")
+            if transcript.outputs.get("corrected_text"):
+                text_exporter.export(transcript, add_timestamp=False, content_key="corrected_text", suffix="_corrected")
+            if transcript.summary:
+                text_exporter.export(transcript, add_timestamp=False, content_key="summary", suffix="_summary")
 
-            if "json" in self.exporters:
-                transcript.outputs["json"] = self.exporters["json"].export(
-                    transcript
-                )
+        if self.markdown or self.github_handler:
+            transcript.outputs["markdown"] = self.write_to_markdown_file(
+                transcript,
+            )
 
-        except Exception as e:
-            raise Exception(f"Error with postprocessing: {e}") from e
+        if "json" in self.exporters:
+            transcript.outputs["json"] = self.exporters["json"].export(
+                transcript
+            )
 
     def clean_up(self):
         self.logger.debug("Cleaning up...")

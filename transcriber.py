@@ -117,7 +117,7 @@ summarize = click.option(
     is_flag=True,
     default=settings.config.getboolean("summarize", False),
     show_default=True,
-    help="Summarize the transcript [only available with deepgram]",
+    help="Summarize the transcript using the configured LLM provider.",
 )
 cutoff_date = click.option(
     "--cutoff-date",
@@ -210,6 +210,19 @@ verbose_logging = click.option(
     help="Supply this flag to enable verbose logging",
 )
 
+correct_transcript = click.option(
+    "--correct",
+    is_flag=True,
+    default=settings.config.getboolean("correct", False),
+    help="Correct the transcript using the configured LLM provider.",
+)
+llm_provider = click.option(
+    "--llm-provider",
+    type=click.Choice(["openai", "google", "claude"]),
+    default=settings.config.get("llm_provider", "openai"),
+    help="LLM provider for correction and summarization.",
+)
+
 add_loc = click.option(
     "--loc",
     default="misc",
@@ -279,6 +292,8 @@ add_category = click.option(
 @nocleanup
 @verbose_logging
 @auto_start_server
+@correct_transcript
+@llm_provider
 def transcribe(
     source: str,
     loc: str,
@@ -303,7 +318,8 @@ def transcribe(
     no_metadata: bool,
     needs_review: bool,
     cutoff_date: str,
-    nocheck: bool,
+    correct: bool,
+    llm_provider: str,
 ) -> None:
     """Transcribe the provided sources. Suported sources include: \n
     - YouTube videos and playlists\n
@@ -342,7 +358,8 @@ def transcribe(
         "include_metadata": not no_metadata,
         "needs_review": needs_review,
         "cutoff_date": cutoff_date,
-        "nocheck": nocheck,
+        "correct": correct,
+        "llm_provider": llm_provider,
     }
     try:
         queue_response = api_client.add_to_queue(data, source)

@@ -81,6 +81,22 @@ class Settings:
         return self._get_env_variable('GITHUB_INSTALLATION_ID',
             "To use GitHub App integration, you need to define a 'GITHUB_INSTALLATION_ID' in your .env file")
 
+    @property
+    def LLM_PROVIDER(self):
+        return os.getenv('LLM_PROVIDER', 'openai')
+
+    @property
+    def OPENAI_API_KEY(self):
+        return self._get_env_variable('OPENAI_API_KEY')
+
+    @property
+    def GOOGLE_API_KEY(self):
+        return self._get_env_variable('GOOGLE_API_KEY')
+
+    @property
+    def CLAUDE_API_KEY(self):
+        return self._get_env_variable('CLAUDE_API_KEY')
+
 # Initialize the Settings class and expose an instance
 settings = Settings()
 
