@@ -355,6 +355,125 @@ def transcribe(
 
 
 @cli.command()
+# Available transcription models and services
+@whisper
+@deepgram
+# Available features for transcription services
+@diarize
+@summarize
+# Options for configuring the transcription postprocess
+@username
+@github
+@upload_to_s3
+@save_to_markdown
+@save_to_text
+@markdown_no_metadata
+@save_to_json
+@needs_review
+# Configuration options
+@model_output_dir
+@nocleanup
+@verbose_logging
+@auto_start_server
+# Backlog processing specific options
+@click.option(
+    "--limit",
+    type=int,
+    default=None,
+    help="Maximum number of items to process from backlog"
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview what would be processed without actually processing"
+)
+@click.option(
+    "--loc",
+    default="all",
+    help="Location filter for sources (default: all locations)"
+)
+def process_backlog(
+    model: str,
+    deepgram: bool,
+    summarize: bool,
+    diarize: bool,
+    username: str,
+    github: bool,
+    upload: bool,
+    verbose: bool,
+    model_output_dir: str,
+    nocleanup: bool,
+    json: bool,
+    markdown: bool,
+    text: bool,
+    no_metadata: bool,
+    needs_review: bool,
+    limit: int,
+    dry_run: bool,
+    loc: str,
+) -> None:
+    """Process transcription backlog directly.
+    
+    This command fetches the current transcription backlog from Bitcoin Transcripts,
+    expands recurring sources (RSS feeds, playlists), filters out already processed
+    items, and immediately starts transcription processing.
+    
+    Features:
+    - Automatic backlog retrieval and source expansion
+    - Intelligent duplicate prevention
+    - Direct processing without manual queue management
+    - Perfect for automated daily processing via cron jobs
+    """
+    configure_logger(log_level=logging.INFO)
+    url = get_transcription_url()
+    api_client = APIClient(url)
+
+    data = {
+        "model": model,
+        "deepgram": deepgram,
+        "summarize": summarize,
+        "diarize": diarize,
+        "username": username,
+        "github": github,
+        "upload": upload,
+        "verbose": verbose,
+        "model_output_dir": model_output_dir,
+        "nocleanup": nocleanup,
+        "json": json,
+        "markdown": markdown,
+        "text": text,
+        "include_metadata": not no_metadata,
+        "needs_review": needs_review,
+        "limit": limit,
+        "dry_run": dry_run,
+        "loc": loc,
+    }
+    
+    try:
+        logger.info("Starting direct backlog processing...")
+        response = api_client.process_backlog(data)
+        logger.info(response)
+        
+        if response.get("status") == "started":
+            logger.info("Backlog processing started successfully")
+            logger.info("Use 'tstbtc get-progress' to monitor progress")
+        elif response.get("status") == "dry_run":
+            logger.info(f"Dry run completed: {response.get('message')}")
+            
+            # Pretty print the detailed dry run report
+            if "detailed_report" in response.get("data", {}):
+                import json
+                logger.info("Detailed dry run report:")
+                logger.info(json.dumps(response["data"]["detailed_report"], indent=2))
+        else:
+            logger.warning(f"Unexpected response status: {response.get('status')}")
+            
+    except Exception as e:
+        logger.error(f"Backlog processing failed: {e}")
+
+
+@cli.command()
 def get_queue():
     """Get the transcription queue"""
     configure_logger(log_level=logging.INFO)
@@ -366,6 +485,20 @@ def get_queue():
         logger.info(response)
     except Exception as e:
         logger.error(f"Failed to get queue: {e}")
+
+
+@cli.command()
+def get_progress():
+    """Get the progress of the current transcription job"""
+    configure_logger(log_level=logging.INFO)
+    url = get_transcription_url()
+    api_client = APIClient(url)
+
+    try:
+        response = api_client.get_progress()
+        logger.info(response)
+    except Exception as e:
+        logger.error(f"Failed to get progress: {e}")
 
 
 @cli.command()
