@@ -16,7 +16,7 @@ from app.logging import get_logger
 from app.data_writer import DataWriter
 from app.data_fetcher import DataFetcher
 from app.github_api_handler import GitHubAPIHandler
-from app.exporters import ExporterFactory, TranscriptExporter
+from app.exporters import ExporterFactory, MarkdownExporter, TranscriptExporter
 
 
 class Transcription:
@@ -50,7 +50,8 @@ class Transcription:
 
         self.transcript_by = self.__configure_username(username)
         # during testing we need to create the markdown for validation purposes
-        self.markdown = markdown or test_mode
+        # also need markdown when pushing to github
+        self.markdown = markdown or test_mode or github
         self.include_metadata = include_metadata
 
         self.metadata_writer = DataWriter(
@@ -462,7 +463,13 @@ class Transcription:
 
         try:
             if "markdown" not in self.exporters:
-                raise Exception("Markdown exporter not configured")
+                self.logger.warning(
+                    "Markdown exporter not found, creating one on the fly"
+                )
+                self.exporters["markdown"] = MarkdownExporter(
+                    output_dir=self.model_output_dir,
+                    transcript_by=self.transcript_by,
+                )
 
             markdown_exporter = self.exporters["markdown"]
             export_kwargs = {
@@ -540,12 +547,18 @@ class Transcription:
             
             for item in filtered_items:
                 try:
-                    # Create transcript source from backlog item
-                    if isinstance(item, dict) and 'media' in item:
-                        # Item is already a source dict
-                        source_data = item
+                    # Map backlog item to add_transcription_source parameters
+                    if isinstance(item, dict):
+                        source_data = {
+                            'source_file': item.get('media') or item.get('source_file'),
+                            'loc': item.get('loc', options.get('loc', 'misc')),
+                            'title': item.get('title'),
+                            'date': item.get('date') or None,
+                            'tags': item.get('tags') or [],
+                            'speakers': item.get('speakers') or [],
+                            'category': item.get('categories') or item.get('category') or [],
+                        }
                     else:
-                        # Item is a URL string, convert to source dict
                         source_data = {
                             'source_file': item,
                             'loc': options.get('loc', 'misc'),
@@ -553,11 +566,13 @@ class Transcription:
                             'date': None,
                             'tags': [],
                             'speakers': [],
-                            'category': []
+                            'category': [],
                         }
-                    
+
                     # Add to transcription sources
-                    self.add_transcription_source(**source_data)
+                    # nocheck=True because _filter_processed_items already
+                    # validated these items need transcription
+                    self.add_transcription_source(**source_data, nocheck=True)
                     
                     # Mark as in progress
                     processing_results["processing_items"].append({

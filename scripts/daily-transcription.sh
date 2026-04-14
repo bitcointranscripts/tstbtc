@@ -54,8 +54,8 @@ RESPONSE=$(curl -s -X POST "$API_URL/transcription/process_backlog/" \
   -d "github=true" \
   -d "markdown=true" \
   -d "limit=50" \
-  -d "loc=all")
-
+  -d "loc=all"\
+ -d "username=0tuedon")
 # Log the response
 log "Processing response: $RESPONSE"
 

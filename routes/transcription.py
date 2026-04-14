@@ -265,11 +265,16 @@ async def process_backlog(
     dry_run: bool = Form(False),
     cutoff_date: Optional[str] = Form(None),
     loc: str = Form("all"),
+    username: str = Form("backlog-processor"),
 ):
     """Process transcription backlog directly without queue management"""
+    global transcription_instance
     try:
         logger.info("Starting direct backlog processing...")
-        
+
+        # Reset any stale global instance
+        reset_transcription_instance()
+
         # Create transcription instance with specified options
         transcription = Transcription(
             model=model,
@@ -280,9 +285,12 @@ async def process_backlog(
             markdown=markdown,
             json=json,
             text_output=text,
-            username="backlog-processor"
+            username=username,
         )
-        
+
+        # Store globally so /progress/ can track this run
+        transcription_instance = transcription
+
         # Prepare options for processing
         processing_options = {
             "model": model,
@@ -298,15 +306,17 @@ async def process_backlog(
             "cutoff_date": cutoff_date,
             "loc": loc
         }
-        
+
         if dry_run:
             # For dry run, fetch, filter, and generate detailed report
             backlog_items = transcription._fetch_and_expand_backlog(**processing_options)
             filtered_items = transcription._filter_processed_items(backlog_items)
-            
+
             # Get comprehensive dry run report
             dry_run_report = transcription.get_dry_run_report()
-            
+
+            reset_transcription_instance()
+
             return {
                 "status": "dry_run",
                 "message": f"Dry run completed. {len(filtered_items)} items would be processed.",
@@ -318,7 +328,7 @@ async def process_backlog(
                     "detailed_report": dry_run_report
                 }
             }
-        
+
         # Run processing in background
         def run_backlog_processing():
             try:
@@ -327,6 +337,7 @@ async def process_backlog(
                 logger.error(f"Error in background backlog processing: {e}")
             finally:
                 transcription.clean_up()
+                reset_transcription_instance()
         
         background_tasks.add_task(run_backlog_processing)
         
@@ -350,15 +361,15 @@ async def process_backlog(
 @router.get("/progress/")
 async def get_progress():
     """Get progress of the current transcription job"""
+    if transcription_instance is None:
+        return {
+            "status": "idle",
+            "message": "No transcription is currently running.",
+        }
+
     try:
-        # Get the current transcription instance
-        transcription = get_transcription_instance()
-        
-        # Get status from the transcription instance
-        status = transcription.get_processing_status()
-        
+        status = transcription_instance.get_processing_status()
         return status
-        
     except Exception as e:
         logger.error(f"Error getting progress: {e}")
         raise HTTPException(status_code=500, detail=str(e))
