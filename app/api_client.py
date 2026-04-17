@@ -67,3 +67,13 @@ class APIClient:
     @api_error_handler
     def get_queue(self):
         return requests.get(f"{self.base_url}/transcription/queue/")
+
+    @api_error_handler
+    def process_backlog(self, data):
+        """Process transcription backlog directly without queue management"""
+        return requests.post(f"{self.base_url}/transcription/process_backlog/", data=data)
+
+    @api_error_handler
+    def get_progress(self):
+        """Get progress of the current transcription job"""
+        return requests.get(f"{self.base_url}/transcription/progress/")
