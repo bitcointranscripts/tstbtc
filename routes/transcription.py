@@ -248,3 +248,128 @@ async def get_queue():
         for transcript in transcription_instance.transcripts
     ]
     return {"data": queue}
+
+
+@router.post("/process_backlog/")
+async def process_backlog(
+    background_tasks: BackgroundTasks,
+    model: str = Form("tiny.en"),
+    deepgram: bool = Form(False),
+    summarize: bool = Form(False),
+    diarize: bool = Form(False),
+    github: bool = Form(False),
+    markdown: bool = Form(True),
+    json: bool = Form(False),
+    text: bool = Form(False),
+    limit: Optional[int] = Form(None),
+    dry_run: bool = Form(False),
+    cutoff_date: Optional[str] = Form(None),
+    loc: str = Form("all"),
+    username: str = Form("backlog-processor"),
+):
+    """Process transcription backlog directly without queue management"""
+    global transcription_instance
+    try:
+        logger.info("Starting direct backlog processing...")
+
+        # Reset any stale global instance
+        reset_transcription_instance()
+
+        # Create transcription instance with specified options
+        transcription = Transcription(
+            model=model,
+            deepgram=deepgram,
+            summarize=summarize,
+            diarize=diarize,
+            github=github,
+            markdown=markdown,
+            json=json,
+            text_output=text,
+            username=username,
+        )
+
+        # Store globally so /progress/ can track this run
+        transcription_instance = transcription
+
+        # Prepare options for processing
+        processing_options = {
+            "model": model,
+            "deepgram": deepgram,
+            "summarize": summarize,
+            "diarize": diarize,
+            "github": github,
+            "markdown": markdown,
+            "json": json,
+            "text": text,
+            "limit": limit,
+            "dry_run": dry_run,
+            "cutoff_date": cutoff_date,
+            "loc": loc
+        }
+
+        if dry_run:
+            # For dry run, fetch, filter, and generate detailed report
+            backlog_items = transcription._fetch_and_expand_backlog(**processing_options)
+            filtered_items = transcription._filter_processed_items(backlog_items)
+
+            # Get comprehensive dry run report
+            dry_run_report = transcription.get_dry_run_report()
+
+            reset_transcription_instance()
+
+            return {
+                "status": "dry_run",
+                "message": f"Dry run completed. {len(filtered_items)} items would be processed.",
+                "data": {
+                    "total_items": len(filtered_items),
+                    "processing_items": [],
+                    "skipped_items": [],
+                    "dry_run": True,
+                    "detailed_report": dry_run_report
+                }
+            }
+
+        # Run processing in background
+        def run_backlog_processing():
+            try:
+                transcription.process_backlog_directly(**processing_options)
+            except Exception as e:
+                logger.error(f"Error in background backlog processing: {e}")
+            finally:
+                transcription.clean_up()
+                reset_transcription_instance()
+        
+        background_tasks.add_task(run_backlog_processing)
+        
+        return {
+            "status": "started",
+            "message": "Backlog processing started in background.",
+            "data": {
+                "total_items": "processing",
+                "processing_items": [],
+                "skipped_items": [],
+                "background": True
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting backlog processing: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/progress/")
+async def get_progress():
+    """Get progress of the current transcription job"""
+    if transcription_instance is None:
+        return {
+            "status": "idle",
+            "message": "No transcription is currently running.",
+        }
+
+    try:
+        status = transcription_instance.get_processing_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

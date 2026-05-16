@@ -1,5 +1,8 @@
 import os
 import tempfile
+import json
+import shutil
+from datetime import datetime
 
 import yt_dlp
 
@@ -13,7 +16,7 @@ from app.logging import get_logger
 from app.data_writer import DataWriter
 from app.data_fetcher import DataFetcher
 from app.github_api_handler import GitHubAPIHandler
-from app.exporters import ExporterFactory, TranscriptExporter
+from app.exporters import ExporterFactory, MarkdownExporter, TranscriptExporter
 
 
 class Transcription:
@@ -47,7 +50,8 @@ class Transcription:
 
         self.transcript_by = self.__configure_username(username)
         # during testing we need to create the markdown for validation purposes
-        self.markdown = markdown or test_mode
+        # also need markdown when pushing to github
+        self.markdown = markdown or test_mode or github
         self.include_metadata = include_metadata
 
         self.metadata_writer = DataWriter(
@@ -459,7 +463,13 @@ class Transcription:
 
         try:
             if "markdown" not in self.exporters:
-                raise Exception("Markdown exporter not configured")
+                self.logger.warning(
+                    "Markdown exporter not found, creating one on the fly"
+                )
+                self.exporters["markdown"] = MarkdownExporter(
+                    output_dir=self.model_output_dir,
+                    transcript_by=self.transcript_by,
+                )
 
             markdown_exporter = self.exporters["markdown"]
             export_kwargs = {
@@ -508,14 +518,557 @@ class Transcription:
             raise Exception(f"Error with postprocessing: {e}") from e
 
     def clean_up(self):
-        self.logger.debug("Cleaning up...")
-        application.clean_up(self.tmp_dir)
+        """Clean up temporary files and directories"""
+        if not self.nocleanup and os.path.exists(self.tmp_dir):
+            shutil.rmtree(self.tmp_dir)
+
+    def process_backlog_directly(self, **options):
+        """Process transcription backlog directly without queue management"""
+        self.status = "in_progress"
+        
+        try:
+            # 1. Fetch and expand backlog
+            backlog_items = self._fetch_and_expand_backlog(**options)
+            
+            # 2. Filter already processed items
+            filtered_items = self._filter_processed_items(backlog_items)
+            
+            # 3. Process items sequentially
+            processing_results = {
+                "status": "in_progress",
+                "total_items": len(filtered_items),
+                "processing_items": [],
+                "skipped_items": [],
+                "started_at": datetime.now().isoformat()
+            }
+            
+            # Track processed items for duplicate prevention
+            newly_processed = []
+            
+            for item in filtered_items:
+                try:
+                    # Map backlog item to add_transcription_source parameters
+                    if isinstance(item, dict):
+                        source_data = {
+                            'source_file': item.get('media') or item.get('source_file'),
+                            'loc': item.get('loc', options.get('loc', 'misc')),
+                            'title': item.get('title'),
+                            'date': item.get('date') or None,
+                            'tags': item.get('tags') or [],
+                            'speakers': item.get('speakers') or [],
+                            'category': item.get('categories') or item.get('category') or [],
+                        }
+                    else:
+                        source_data = {
+                            'source_file': item,
+                            'loc': options.get('loc', 'misc'),
+                            'title': None,
+                            'date': None,
+                            'tags': [],
+                            'speakers': [],
+                            'category': [],
+                        }
+
+                    # Add to transcription sources
+                    # nocheck=True because _filter_processed_items already
+                    # validated these items need transcription
+                    self.add_transcription_source(**source_data, nocheck=True)
+                    
+                    # Mark as in progress
+                    processing_results["processing_items"].append({
+                        "title": source_data.get('title', str(item)),
+                        "media": source_data.get('media', item),
+                        "status": "in_progress",
+                        "error": None
+                    })
+                    
+                except Exception as e:
+                    # Mark as failed
+                    processing_results["processing_items"].append({
+                        "title": source_data.get('title', str(item)),
+                        "media": source_data.get('media', item),
+                        "status": "failed",
+                        "error": str(e)
+                    })
+                    self.logger.error(f"Failed to process item {item}: {e}")
+            
+            # 4. Start processing if we have items
+            if self.transcripts:
+                self.start()
+                processing_results["status"] = "completed"
+                
+                # Update processed items tracking
+                for transcript in self.transcripts:
+                    if transcript.status == "completed":
+                        newly_processed.append({
+                            'id': transcript.source.source_file,
+                            'title': transcript.title,
+                            'media': transcript.source.source_file,
+                            'loc': transcript.source.loc
+                        })
+                
+                self._update_processed_tracking(newly_processed)
+                
+                # Update final status
+                for result in processing_results["processing_items"]:
+                    if result["status"] == "in_progress":
+                        result["status"] = "completed"
+                        result["error"] = None
+            else:
+                processing_results["status"] = "completed"
+                processing_results["message"] = "No items to process"
+            
+            processing_results["completed_at"] = datetime.now().isoformat()
+            return processing_results
+            
+        except Exception as e:
+            self.status = "failed"
+            processing_results["status"] = "failed"
+            processing_results["error"] = str(e)
+            self.logger.error(f"Error in direct backlog processing: {e}")
+            raise Exception(f"Error with direct backlog processing: {e}") from e
+
+    def _fetch_and_expand_backlog(self, **options):
+        """Fetch backlog and expand recurring sources"""
+        try:
+            # Get transcription backlog
+            backlog_items = self.data_fetcher.get_transcription_backlog()
+            
+            # Get sources for expansion
+            loc = options.get('loc', 'all')
+            sources = self.data_fetcher.get_sources(loc, 'none', cache=True)
+            
+            # Expand recurring sources
+            expanded_items = []
+            expansion_details = []
+            
+            for source in sources:
+                if source.get('type') in ['rss', 'playlist']:
+                    try:
+                        # Create a temporary transcription instance for preprocessing
+                        temp_transcription = Transcription(
+                            username="temp", 
+                            batch_preprocessing_output=True
+                        )
+                        
+                        # Add the source for preprocessing
+                        temp_transcription.add_transcription_source(
+                            source_file=source.get('source'),
+                            loc=source.get('loc', 'misc'),
+                            title=source.get('title'),
+                            date=source.get('date'),
+                            tags=source.get('tags', []),
+                            category=source.get('category', []),
+                            speakers=source.get('speakers', []),
+                            preprocess=True,
+                            cutoff_date=options.get('cutoff_date')
+                        )
+                        
+                        # Get preprocessed items
+                        if temp_transcription.preprocessing_output:
+                            expanded_items.extend(temp_transcription.preprocessing_output)
+                            expansion_details.append({
+                                'source': source.get('title', 'Unknown'),
+                                'type': source.get('type'),
+                                'url': source.get('source'),
+                                'expanded_count': len(temp_transcription.preprocessing_output),
+                                'location': source.get('loc', 'misc')
+                            })
+                        
+                        # Clean up temp instance
+                        temp_transcription.clean_up()
+                        
+                    except Exception as e:
+                        self.logger.warning(f"Failed to expand source {source.get('title')}: {e}")
+                        expansion_details.append({
+                            'source': source.get('title', 'Unknown'),
+                            'type': source.get('type'),
+                            'url': source.get('source'),
+                            'error': str(e),
+                            'location': source.get('loc', 'misc')
+                        })
+                        continue
+            
+            # Combine backlog items with expanded sources
+            all_items = backlog_items + expanded_items
+            
+            # Apply limit if specified
+            limit = options.get('limit')
+            original_count = len(all_items)
+            if limit and isinstance(limit, int) and limit > 0:
+                all_items = all_items[:limit]
+            
+            # Store expansion details for dry run reporting
+            self.expansion_details = {
+                'backlog_items': len(backlog_items),
+                'expanded_sources': len(sources),
+                'expanded_items': len(expanded_items),
+                'total_before_limit': original_count,
+                'total_after_limit': len(all_items),
+                'limit_applied': limit if limit else None,
+                'expansion_details': expansion_details,
+                'location_filter': loc,
+                'cutoff_date': options.get('cutoff_date')
+            }
+            
+            self.logger.info(f"Fetched {len(backlog_items)} backlog items and {len(expanded_items)} expanded sources")
+            return all_items
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching and expanding backlog: {e}")
+            raise
+
+    def _filter_processed_items(self, items):
+        """Filter out already processed items"""
+        try:
+            # Load existing media and transcripts
+            existing_media = self.data_fetcher.get_existing_media()
+            
+            # Load processed items tracking
+            processed_items = self._load_processed_items()
+            
+            # Get the current backlog to know which items are legitimately in need of transcription
+            try:
+                current_backlog = self.data_fetcher.get_transcription_backlog()
+                
+                # Debug logging to see the actual structure
+                self.logger.debug(f"Raw backlog data type: {type(current_backlog)}")
+                if current_backlog:
+                    self.logger.debug(f"First backlog item type: {type(current_backlog[0])}")
+                    self.logger.debug(f"First backlog item: {current_backlog[0]}")
+                
+                # Extract media URLs from backlog items (they might be dicts or strings)
+                current_backlog_urls = set()
+                for item in current_backlog:
+                    if isinstance(item, dict):
+                        # If it's a dict, extract the media URL
+                        media_url = item.get('media') or item.get('source_file')
+                        if media_url:
+                            current_backlog_urls.add(media_url)
+                    else:
+                        # If it's a string, use it directly
+                        current_backlog_urls.add(str(item))
+                
+                self.logger.debug(f"Current backlog contains {len(current_backlog)} items, extracted {len(current_backlog_urls)} URLs")
+            except Exception as e:
+                self.logger.warning(f"Failed to get current backlog, proceeding without backlog filtering: {e}")
+                current_backlog = []
+                current_backlog_urls = set()
+            
+            filtered_items = []
+            skipped_items = []
+            
+            for item in items:
+                # Determine item identifier
+                if isinstance(item, dict):
+                    item_id = item.get('media') or item.get('source_file')
+                    item_title = item.get('title', str(item))
+                    item_loc = item.get('loc', 'unknown')
+                else:
+                    item_id = str(item)
+                    item_title = str(item)
+                    item_loc = 'unknown'
+                
+                # Skip items without valid media ID
+                if not item_id:
+                    self.logger.warning(f"Skipping item without media ID: {item}")
+                    continue
+                
+                # Check if already processed in our tracking
+                if item_id in processed_items:
+                    skipped_items.append({
+                        'title': item_title,
+                        'media': item_id,
+                        'reason': 'recently_processed',
+                        'location': item_loc,
+                        'details': 'Item was processed in a previous run'
+                    })
+                    continue
+                
+                # IMPORTANT: If the item is in the current backlog, it needs transcription
+                # regardless of whether media exists in the repository
+                if item_id in current_backlog_urls:
+                    # This item is legitimately in the backlog and needs transcription
+                    filtered_items.append(item)
+                    continue
+                
+                # Only check existing media for items that are NOT in the current backlog
+                # (e.g., items from expanded sources that might have been added since the last backlog update)
+                if item_id in existing_media:
+                    skipped_items.append({
+                        'title': item_title,
+                        'media': item_id,
+                        'reason': 'existing_media',
+                        'location': item_loc,
+                        'details': 'Media already exists in repository and not in current backlog'
+                    })
+                    continue
+                
+                # If we get here, the item should be processed
+                filtered_items.append(item)
+            
+            # Store filtering details for dry run reporting
+            items_to_process_details = []
+            for item in filtered_items:
+                if isinstance(item, dict):
+                    # Item is a dictionary (from expanded sources)
+                    item_detail = {
+                        'title': item.get('title', 'Unknown Title'),
+                        'media': item.get('media') or item.get('source_file', 'Unknown Media'),
+                        'location': item.get('loc', 'unknown'),
+                        'type': 'expanded_source',
+                        'date': item.get('date'),
+                        'tags': item.get('tags', []),
+                        'speakers': item.get('speakers', []),
+                        'category': item.get('category', [])
+                    }
+                else:
+                    # Item is a string (from backlog)
+                    item_detail = {
+                        'title': str(item),
+                        'media': str(item),
+                        'location': 'unknown',
+                        'type': 'backlog_item',
+                        'date': None,
+                        'tags': [],
+                        'speakers': [],
+                        'category': []
+                    }
+                items_to_process_details.append(item_detail)
+            
+            self.filtering_details = {
+                'total_items_checked': len(items),
+                'items_to_process': len(filtered_items),
+                'items_skipped': len(skipped_items),
+                'existing_media_count': len(existing_media),
+                'processed_tracking_count': len(processed_items),
+                'backlog_items_count': len(current_backlog),
+                'skipped_items_details': skipped_items,
+                'items_to_process_details': items_to_process_details
+            }
+            
+            self.logger.info(f"Filtered {len(items)} items: {len(filtered_items)} to process, {len(skipped_items)} skipped")
+            self.logger.info(f"Current backlog contains {len(current_backlog)} items")
+            return filtered_items
+            
+        except Exception as e:
+            self.logger.error(f"Error filtering processed items: {e}")
+            raise
+
+    def _load_processed_items(self):
+        """Load list of processed items from file"""
+        try:
+            tracking_file = os.path.join(self.tmp_dir, 'processed_items.json')
+            if os.path.exists(tracking_file):
+                with open(tracking_file, 'r') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            self.logger.warning(f"Error loading processed items: {e}")
+            return {}
+
+    def _mark_item_processed(self, item_id, item_data):
+        """Mark item as processed with timestamp and metadata"""
+        try:
+            processed = self._load_processed_items()
+            processed[item_id] = {
+                'processed_at': datetime.now().isoformat(),
+                'title': item_data.get('title'),
+                'media': item_data.get('media'),
+                'loc': item_data.get('loc'),
+                'last_backlog_check': datetime.now().isoformat()
+            }
+            
+            tracking_file = os.path.join(self.tmp_dir, 'processed_items.json')
+            with open(tracking_file, 'w') as f:
+                json.dump(processed, f, indent=2)
+                
+        except Exception as e:
+            self.logger.error(f"Error marking item as processed: {e}")
+
+    def _update_processed_tracking(self, newly_processed_items):
+        """Update tracking of newly processed items"""
+        try:
+            for item in newly_processed_items:
+                self._mark_item_processed(
+                    item['id'], 
+                    {
+                        'title': item['title'],
+                        'media': item['media'],
+                        'loc': item['loc']
+                    }
+                )
+            
+            self.logger.info(f"Updated tracking for {len(newly_processed_items)} newly processed items")
+            
+        except Exception as e:
+            self.logger.error(f"Error updating processed tracking: {e}")
+
+    def _cleanup_processed_items(self, current_backlog):
+        """Remove processed items that are no longer in the backlog (merged to repo)"""
+        try:
+            processed = self._load_processed_items()
+            current_backlog_urls = set()
+            
+            # Extract URLs from current backlog
+            for item in current_backlog:
+                if isinstance(item, dict):
+                    url = item.get('media') or item.get('source_file')
+                else:
+                    url = str(item)
+                if url:
+                    current_backlog_urls.add(url)
+            
+            # Find items to remove
+            items_to_remove = []
+            for item_id, item_data in processed.items():
+                if item_data.get('media') not in current_backlog_urls:
+                    items_to_remove.append(item_id)
+            
+            # Remove confirmed items from tracking
+            for item_id in items_to_remove:
+                del processed[item_id]
+                self.logger.info(f"Removed {item_id} from processed items (confirmed in repository)")
+            
+            # Update the tracking file
+            if items_to_remove:
+                tracking_file = os.path.join(self.tmp_dir, 'processed_items.json')
+                with open(tracking_file, 'w') as f:
+                    json.dump(processed, f, indent=2)
+            
+            return len(items_to_remove)
+            
+        except Exception as e:
+            self.logger.error(f"Error cleaning up processed items: {e}")
+            return 0
+
+    def get_processing_status(self):
+        """Get current processing status and progress"""
+        try:
+            if not self.transcripts:
+                return {
+                    "status": "idle",
+                    "progress": {
+                        "total_items": 0,
+                        "completed": 0,
+                        "failed": 0,
+                        "in_progress": 0
+                    },
+                    "message": "No transcription job in progress",
+                    "items": []
+                }
+            
+            # Calculate progress from current transcripts
+            total_items = len(self.transcripts)
+            completed = sum(1 for t in self.transcripts if t.status == "completed")
+            failed = sum(1 for t in self.transcripts if t.status == "failed")
+            in_progress = sum(1 for t in self.transcripts if t.status == "in_progress")
+            
+            # Build items list with status
+            items = []
+            for transcript in self.transcripts:
+                item_info = {
+                    "title": transcript.title,
+                    "media": transcript.source.source_file,
+                    "status": transcript.status,
+                    "error": None
+                }
+                
+                # Add error information if failed
+                if transcript.status == "failed":
+                    item_info["error"] = "Processing failed"
+                
+                items.append(item_info)
+            
+            return {
+                "status": self.status,
+                "progress": {
+                    "total_items": total_items,
+                    "completed": completed,
+                    "failed": failed,
+                    "in_progress": in_progress
+                },
+                "message": f"Processing {total_items} items: {completed} completed, {failed} failed, {in_progress} in progress",
+                "items": items
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting processing status: {e}")
+            return {
+                "status": "error",
+                "progress": {
+                    "total_items": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "in_progress": 0
+                },
+                "message": f"Error retrieving status: {str(e)}",
+                "items": []
+            }
+
+    def get_dry_run_report(self):
+        """Get detailed dry run report with expansion and filtering information"""
+        try:
+            if not hasattr(self, 'expansion_details') or not hasattr(self, 'filtering_details'):
+                return {
+                    "status": "error",
+                    "message": "No dry run data available. Run _fetch_and_expand_backlog and _filter_processed_items first."
+                }
+            
+            # Debug logging
+            self.logger.debug(f"Expansion details keys: {list(self.expansion_details.keys())}")
+            self.logger.debug(f"Filtering details keys: {list(self.filtering_details.keys())}")
+            self.logger.debug(f"Items to process count: {self.filtering_details.get('items_to_process', 'NOT_FOUND')}")
+            self.logger.debug(f"Items to process details count: {len(self.filtering_details.get('items_to_process_details', []))}")
+            
+            # Build comprehensive dry run report
+            report = {
+                "status": "dry_run_report",
+                "summary": {
+                    "total_items_found": self.expansion_details['total_before_limit'],
+                    "total_items_to_process": self.filtering_details['items_to_process'],
+                    "total_items_skipped": self.filtering_details['items_skipped'],
+                    "limit_applied": self.expansion_details['limit_applied']
+                },
+                "expansion_details": {
+                    "backlog_items": self.expansion_details['backlog_items'],
+                    "expanded_sources": self.expansion_details['expanded_sources'],
+                    "expanded_items": self.expansion_details['expanded_items'],
+                    "location_filter": self.expansion_details['location_filter'],
+                    "cutoff_date": self.expansion_details['cutoff_date'],
+                    "source_details": self.expansion_details['expansion_details']
+                },
+                "filtering_details": {
+                    "existing_media_count": self.filtering_details['existing_media_count'],
+                    "processed_tracking_count": self.filtering_details['processed_tracking_count'],
+                    "backlog_items_count": self.filtering_details['backlog_items_count'],
+                    "skipped_items": self.filtering_details['skipped_items_details'],
+                    "items_to_process": self.filtering_details['items_to_process_details']
+                },
+                "configuration": {
+                    "deepgram": getattr(self, 'deepgram', False),
+                    "diarize": getattr(self, 'diarize', False),
+                    "summarize": getattr(self, 'summarize', False),
+                    "github": getattr(self, 'github', False),
+                    "markdown": getattr(self, 'markdown', False),
+                    "json": getattr(self, 'json', False),
+                    "text": getattr(self, 'text_output', False)
+                }
+            }
+            
+            return report
+            
+        except Exception as e:
+            self.logger.error(f"Error generating dry run report: {e}")
+            return {
+                "status": "error",
+                "message": f"Error generating dry run report: {str(e)}"
+            }
 
     def __del__(self):
-        if self.nocleanup:
-            self.logger.info("Not cleaning up temp files...")
-        else:
-            self.clean_up()
+        """Cleanup when object is destroyed"""
+        if not self.nocleanup and os.path.exists(self.tmp_dir):
+            shutil.rmtree(self.tmp_dir)
 
     def __str__(self):
         excluded_fields = ["logger", "existing_media"]
