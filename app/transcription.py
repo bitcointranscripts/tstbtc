@@ -86,7 +86,7 @@ class Transcription:
         self.transcripts: list[Transcript] = []
         self.existing_media = None
         self.preprocessing_output = [] if batch_preprocessing_output else None
-        self.data_fetcher = DataFetcher(settings.BTC_TRANSCRIPTS_URL)
+        self.data_fetcher = None if test_mode else DataFetcher(settings.BTC_TRANSCRIPTS_URL)
 
         self.logger.debug(f"Temp directory: {self.tmp_dir}")
 
